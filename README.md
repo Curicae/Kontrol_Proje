@@ -1,113 +1,101 @@
-# MATLAB Trafik Simülasyon Projesi
+# PID Kontrollü Trafik Işığı Simülasyonu
 
-Bu proje, kavşaklardaki trafik akışını simüle etmek ve trafik ışıklarının zamanlamalarını PID kontrolcü kullanarak optimize etmek için geliştirilmiş bir MATLAB uygulamasıdır. Projede hem MATLAB script tabanlı simülasyon motoru hem de otomatik oluşturulan bir Simulink modeli bulunmaktadır.
+## Proje Hakkında
+Bu proje, gerçek zamanlı trafik verilerini kullanarak PID kontrolcü ile yönetilen bir trafik ışığı simülasyonu gerçekleştirmektedir. Proje, OpenStreetMap verilerini kullanarak gerçek dünya trafik koşullarını simüle eder ve PID kontrolcü ile trafik akışını optimize eder.
 
-## Özellikler
+## Proje Ekibi
+- [Öğrenci Adı Soyadı] - [Öğrenci Numarası]
+- [Danışman Hocanın Adı Soyadı] - [Bölüm/Üniversite]
 
-* Farklı kavşak konumları için yapılandırılabilir trafik senaryoları
-* Trafik yoğunluğu verisi için Overpass API entegrasyonu
-* Trafik ışığı zamanlamalarını dinamik olarak ayarlayan PID kontrolcü
-* Kavşak durumu ve performans metrikleri için gerçek zamanlı görselleştirme
-* Programatik olarak oluşturulan Simulink modeli (`.slx`)
-* MATLAB R2024b için özel olarak tasarlanmış yapı
+## Proje Amacı
+Bu projenin temel amacı:
+1. Gerçek zamanlı trafik verilerini kullanarak trafik simülasyonu yapmak
+2. PID kontrolcü ile trafik ışığı sürelerini optimize etmek
+3. Trafik yoğunluğuna göre dinamik olarak ışık sürelerini ayarlamak
+4. Simülasyon sonuçlarını görselleştirmek ve analiz etmek
+
+## Kullanılan Teknolojiler
+- MATLAB R2024b
+- Simulink
+- Overpass API (OpenStreetMap veri erişimi)
+- PID Kontrol Teorisi
 
 ## Proje Yapısı
-
-Projenin dosya ve klasör yapısı:
-
-* **Ana Dizin:**
-  * `main_simulation.m`: Ana simülasyonu çalıştıran script
-  * `run_config.m`: Yapılandırma ayarları için interaktif arayüz
-  * `create_traffic_model.m`: Simulink modelini otomatik olarak oluşturur
-  * `initialize_parameters.m`: Simülasyon parametrelerini tanımlar
-  * `traffic_data.m`: API'den trafik verisi almak için fonksiyonlar
-  * `test_traffic_model.m`: Simulink model oluşturma testleri
-  * `config.m` ve `config.mat`: Yapılandırma verileri
-  * `README.md`: Bu dokümantasyon dosyası
-
-* **src/**: Kaynak kod klasörü
-  * `control/`: Kontrol algoritmaları
-  * `metrics/`: Ölçüm ve kayıt fonksiyonları
-  * `traffic/`: Trafik modelleme fonksiyonları
-  * `utils/`: Yardımcı fonksiyonlar ve görselleştirme araçları
-
-* **test/**: Test scriptleri
-  * `test_overpass_api.m`: API entegrasyon testi
+```
+Kontrol_Proje/
+├── src/
+│   ├── control/         # PID kontrolcü ve ilgili fonksiyonlar
+│   ├── traffic/         # Trafik simülasyonu fonksiyonları
+│   └── metrics/         # Performans ölçüm fonksiyonları
+├── test/               # Test dosyaları
+├── utils/             # Yardımcı fonksiyonlar
+└── docs/              # Proje dokümantasyonu
+```
 
 ## Kurulum ve Çalıştırma
-
-### Gereksinimler
-
-* MATLAB R2024b
-* Simulink
-* Control System Toolbox
-* İnternet bağlantısı (API kullanımı için)
-
-### MATLAB R2024b Özellikleri
-
-> **ÖNEMLİ:** Bu proje, MATLAB R2024b'nin özelliklerini kullanmaktadır:
-> 
-> * `Uniform Random Number` bloğu kullanılmaktadır
-> * `Switch` bloğunda `u2~=0` formatı kullanılmaktadır
-> * `Relational Operator` bloğu kullanılarak sıfırla karşılaştırma yapılmaktadır
-> * Modern Simulink blok parametreleri ve bağlantı API'leri kullanılmaktadır
-
-### Çalıştırma Adımları
-
-1. **Yapılandırma:**
-   ```matlab
-   run('run_config.m')
+1. MATLAB R2024b veya üzeri sürümü yükleyin
+2. Projeyi klonlayın:
+   ```bash
+   git clone [proje-url]
    ```
-   Kavşak konumu ve API kullanımı gibi ayarları yapılandırır.
+3. MATLAB'da proje klasörüne gidin
+4. `main_simulation.m` dosyasını çalıştırın
 
-2. **Ana Simülasyon:**
-   ```matlab
-   run('main_simulation.m')
-   ```
-   Tam simülasyonu başlatır ve görsel çıktılar sağlar.
+## Özellikler
+- Gerçek zamanlı trafik verisi entegrasyonu
+- PID kontrolcü ile dinamik trafik ışığı yönetimi
+- Görsel simülasyon arayüzü
+- Performans metrikleri ve analiz araçları
+- Çoklu senaryo desteği
 
-3. **Simulink Modeli Oluşturma:**
-   ```matlab
-   run('create_traffic_model.m')
-   ```
-   `traffic_light_model.slx` dosyasını oluşturur.
+## Simülasyon Parametreleri
+- Simülasyon süresi: 1 saat
+- Zaman adımı: 1 saniye
+- Minimum yeşil süre: 15 saniye
+- Maksimum yeşil süre: 90 saniye
+- Sarı ışık süresi: 3 saniye
 
-4. **API Testi (İsteğe Bağlı):**
-   ```matlab
-   cd test
-   run('test_overpass_api.m')
-   ```
-   API bağlantısını ve veri işleme özelliklerini test eder.
+## PID Kontrolcü Parametreleri
+- Kuzey-Güney yönü:
+  - Kp: 0.5
+  - Ki: 0.1
+  - Kd: 0.05
+- Doğu-Batı yönü:
+  - Kp: 0.5
+  - Ki: 0.1
+  - Kd: 0.05
 
-## Mevcut Durum
+## Test Senaryoları
+1. Normal trafik yoğunluğu
+2. Yoğun trafik durumu
+3. Dengesiz trafik dağılımı
+4. Acil durum senaryoları
 
-* **API Entegrasyonu:** Overpass API entegrasyonu tamamlanmış, veri işleme sorunları çözülmüştür.
-* **İki Modül:** Script-tabanlı (`main_simulation.m`) ve model-tabanlı (`traffic_light_model.slx`) simülasyonlar ayrı modüllerde çalışmaktadır.
-* **MATLAB Uyumluluğu:** Bu proje özellikle MATLAB R2024b için optimize edilmiştir.
+## Sonuçlar ve Analiz
+Proje, aşağıdaki metrikleri ölçer ve analiz eder:
+- Ortalama bekleme süreleri
+- Kuyruk uzunlukları
+- Trafik yoğunluğu dağılımı
+- PID kontrolcü performansı
 
 ## Gelecek Geliştirmeler
+1. Makine öğrenmesi entegrasyonu
+2. Çoklu kavşak senaryoları
+3. Gerçek zamanlı veri entegrasyonu
+4. Web arayüzü geliştirme
 
-* API veri işleme mekanizmasının daha da güçlendirilmesi
-* Simulink modelinin ana simülasyonla tam entegrasyonu
-* Q-learning ve Fuzzy Logic gibi alternatif kontrol stratejilerinin uygulanması
-* Kullanıcı dostu bir grafik arayüzü geliştirilmesi (MATLAB App Designer)
-* Çoklu kavşak koordinasyonu
-* Gerçek dünyadaki sensörlerle entegrasyon
-
-## Sorun Giderme
-
-* **MATLAB Sürüm Uyumluluğu:** Bu proje sadece MATLAB R2024b ile çalışmak üzere tasarlanmıştır, diğer sürümlerde çalıştırmak için script'lerin güncellenmesi gerekebilir
-* **API Bağlantı Hatası:** Internet bağlantınızı kontrol edin veya `config.m` dosyasından alternatif API URL'sini yapılandırın
-* **Model Oluşturma Hataları:** `create_traffic_model.m` dosyasındaki modül parametrelerini ve bağlantıları kontrol edin
-
-## Katkıda Bulunanlar
-
-* MATLAB Trafik Simülasyon Ekibi
+## Kaynaklar
+- [OpenStreetMap](https://www.openstreetmap.org)
+- [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API)
+- [PID Control Theory](https://en.wikipedia.org/wiki/PID_controller)
+- [MATLAB Documentation](https://www.mathworks.com/help/matlab/)
 
 ## Lisans
+Bu proje [MIT Lisansı](LICENSE) altında lisanslanmıştır.
 
-* Bu proje eğitim amaçlı olup, akademik kullanım için serbestçe dağıtılabilir.
+## İletişim
+- E-posta: [e-posta-adresi]
+- GitHub: [github-profil-linki]
 
 ---
-
-Son Güncelleme: Mayıs 2024
+*Bu proje [Üniversite Adı] [Bölüm Adı] Bölümü Bitirme Projesi olarak hazırlanmıştır.*

@@ -28,7 +28,16 @@ fprintf('Trafik Işığı Simülasyonu Başlatılıyor...\n');
 
 % 1. Parametreleri Yükle
 run('initialize_parameters.m');
-fprintf('Parametreler yüklendi.\n');
+% PID parametrelerini artır - daha dinamik tepki için
+PID_gains_NS.Kp = PID_gains_NS.Kp * 3.0; % P kazancını artır
+PID_gains_NS.Ki = PID_gains_NS.Ki * 2.0; % I kazancını artır
+PID_gains_NS.Kd = PID_gains_NS.Kd * 1.5; % D kazancını artır
+
+PID_gains_EW.Kp = PID_gains_EW.Kp * 3.0; % P kazancını artır
+PID_gains_EW.Ki = PID_gains_EW.Ki * 2.0; % I kazancını artır
+PID_gains_EW.Kd = PID_gains_EW.Kd * 1.5; % D kazancını artır
+
+fprintf('Parametreler yüklendi ve PID kazançları artırıldı.\n');
 
 % 2. Araç Kuyruklarını Başlat
 vehicle_queues = struct('north', [], 'south', [], 'east', [], 'west', []);
@@ -105,15 +114,56 @@ for t = 1:time_step_size:total_simulation_duration
             % API'den trafik verisini al
             api_traffic_data = traffic_data();
         
-            % API'den gelen trafik yoğunluklarını kullan
+            % API'den gelen trafik yoğunluklarını kullan ve değerleri abartılı hale getir
             density_NS = (api_traffic_data.north_density + api_traffic_data.south_density) / 2;
             density_EW = (api_traffic_data.east_density + api_traffic_data.west_density) / 2;
-        
-            fprintf('  API veri alındı. Gerçek trafik yoğunlukları kullanılıyor.\n');
+            
+            % Yoğunlukları daha belirgin hale getir - kontrast artır
+            density_NS = 0.5 + (density_NS - 0.5) * 1.8;  % 0.5'ten uzaklaştır
+            density_EW = 0.5 + (density_EW - 0.5) * 1.8;  % 0.5'ten uzaklaştır
+            
+            % Sınırları kontrol et
+            density_NS = max(0.1, min(0.9, density_NS));
+            density_EW = max(0.1, min(0.9, density_EW));
+            
+            % Her 20 simülasyon adımında bir, yoğunlukları karşıt yönlerde rastgele değiştir
+            if mod(t, 20) == 0
+                % Yoğunlukları ters yönlere ittir
+                random_shift = 0.15 * rand();
+                if density_NS > density_EW
+                    density_NS = density_NS + random_shift;
+                    density_EW = density_EW - random_shift;
+                else
+                    density_NS = density_NS - random_shift;
+                    density_EW = density_EW + random_shift;
+                end
+                % Sınırları tekrar kontrol et
+                density_NS = max(0.1, min(0.9, density_NS));
+                density_EW = max(0.1, min(0.9, density_EW));
+            end
+            
+            fprintf('  API veri alındı. Gerçek trafik yoğunlukları kullanılıyor (artırılmış).\n');
         catch api_error
             % API çalışmazsa ya da hata verirse, hesaplanan yoğunlukları kullan
             [density_NS, density_EW] = calculate_density(vehicle_queues, approaching_vehicle_time_window, current_light_state);
-            fprintf('  API hatası, hesaplanan trafik yoğunlukları kullanılıyor.\n');
+            
+            % Her 20 simülasyon adımında bir, yoğunlukları karşıt yönlerde rastgele değiştir
+            if mod(t, 20) == 0
+                % Yoğunlukları ters yönlere ittir
+                random_shift = 0.2 * rand();
+                if density_NS > density_EW
+                    density_NS = density_NS + random_shift;
+                    density_EW = density_EW - random_shift;
+                else
+                    density_NS = density_NS - random_shift;
+                    density_EW = density_EW + random_shift;
+                end
+                % Sınırları tekrar kontrol et
+                density_NS = max(0.1, min(0.9, density_NS));
+                density_EW = max(0.1, min(0.9, density_EW));
+            end
+            
+            fprintf('  API hatası, hesaplanan trafik yoğunlukları kullanılıyor (artırılmış).\n');
         end
         fprintf('  Trafik yoğunlukları hesaplandı. NS: %.2f, EW: %.2f\n', density_NS, density_EW);
     
@@ -126,8 +176,12 @@ for t = 1:time_step_size:total_simulation_duration
         if strcmp(current_light_state, 'NS_green')
             % Kuzey-Güney yönü için PID kontrolü
             error_signal = density_NS - density_EW;
+            % Hatayı büyüt
+            error_signal = error_signal * 2.0;
             [pid_output_NS, integral_term_NS, derivative_NS] = pid_controller(...
                 error_signal, PID_gains_NS, previous_error_NS, integral_term_NS, time_step_size);
+            % Çıkışı daha büyük bir aralığa yay
+            pid_output_NS = pid_output_NS * 1.5;
             next_green_duration_NS = max(min_green_duration, min(max_green_duration, base_green_duration + pid_output_NS));
             previous_error_NS = error_signal;
             green_duration_NS = next_green_duration_NS;
@@ -135,8 +189,12 @@ for t = 1:time_step_size:total_simulation_duration
         elseif strcmp(current_light_state, 'EW_green')
             % Doğu-Batı yönü için PID kontrolü
             error_signal = density_EW - density_NS;
+            % Hatayı büyüt
+            error_signal = error_signal * 2.0;
             [pid_output_EW, integral_term_EW, derivative_EW] = pid_controller(...
                 error_signal, PID_gains_EW, previous_error_EW, integral_term_EW, time_step_size);
+            % Çıkışı daha büyük bir aralığa yay
+            pid_output_EW = pid_output_EW * 1.5;
             next_green_duration_EW = max(min_green_duration, min(max_green_duration, base_green_duration + pid_output_EW));
             previous_error_EW = error_signal;
             green_duration_EW = next_green_duration_EW;

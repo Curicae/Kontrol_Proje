@@ -1,51 +1,60 @@
-% test_overpass_api.m - Overpass API bağlantısını test etmek için script
-% Bu script trafiği simüle etmek için gerçek trafik verisi almayı dener
+% test_overpass_api.m - Overpass API test dosyası
+clear;
+clc;
 
 fprintf('=== Overpass API Testi ===\n\n');
 
-% Config dosyasını yükle
-try
-    config_data = load('../config.mat');
-    configuration = config_data.configuration;
-    
-    fprintf('Mevcut yapılandırma:\n');
-    fprintf('Lokasyon: Enlem=%.4f, Boylam=%.4f\n', ...
-            configuration.intersection_location.lat, ...
-            configuration.intersection_location.long);
-    fprintf('Arama yarıçapı: %d metre\n\n', configuration.overpass_radius);
-catch
-    fprintf('Config dosyası bulunamadı. Varsayılan değerler kullanılacak.\n');
-    configuration = struct();
-    configuration.intersection_location = struct('lat', 41.0370, 'long', 28.9850);
-    configuration.overpass_radius = 500;
-end
+% Yapılandırma bilgilerini göster
+fprintf('Mevcut yapılandırma:\n');
+fprintf('Lokasyon: Enlem=41.0370, Boylam=28.9850\n');
+fprintf('Arama yarıçapı: 500 metre\n\n');
 
-% API URL tanımı
-url = 'https://overpass-api.de/api/interpreter';
-fprintf('API URL: %s\n\n', url);
+% API URL'si
+api_url = 'https://overpass-api.de/api/interpreter';
 
-% Overpass QL sorgusu
-query = sprintf('[out:json];way["highway"](around:%d,%.6f,%.6f);out body;>;out skel;', ...
-    configuration.overpass_radius, ...
-    configuration.intersection_location.lat, ...
-    configuration.intersection_location.long);
+% Overpass QL sorgusu oluştur
+query = '[out:json];way["highway"](around:500,41.037000,28.985000);out body;>;out skel;';
 
+fprintf('API URL: %s\n\n', api_url);
 fprintf('Sorgu gönderiliyor...\n');
 fprintf('Sorgu içeriği:\n%s\n\n', query);
 
-% HTTP isteği yapma
+% Web options yapılandırması
+options = weboptions('ContentType', 'json', 'Timeout', 30);
+
 try
-    options = weboptions('MediaType', 'application/x-www-form-urlencoded', 'Timeout', 30);
+    % API isteği gönder
     tic;
-    fprintf('API isteği yapılıyor...\n');
-    response = webwrite(url, 'data', query, options);
+    response = webread(api_url, 'data', query, options);
     fetch_time = toc;
     fprintf('API yanıtı %.2f saniyede alındı.\n\n', fetch_time);
     
     % Yanıt kontrolü
     if isstruct(response) && isfield(response, 'elements')
-        elements = response.elements;
+        elements = response.elements;  % Bu bir cell array
         fprintf('Yanıt alındı: %d eleman içeriyor\n', length(elements));
+        
+        % Debug için ilk birkaç elemanı detaylı göster
+        fprintf('\nİlk 3 elemanın detaylı yapısı:\n');
+        for i = 1:min(3, length(elements))
+            fprintf('\nEleman %d:\n', i);
+            element = elements{i};  % Cell array'den struct'ı al
+            if isstruct(element)
+                fields = fieldnames(element);
+                for j = 1:length(fields)
+                    field = fields{j};
+                    value = element.(field);
+                    if isstruct(value)
+                        fprintf('  %s: [struct]\n', field);
+                        if strcmp(field, 'tags') && isfield(value, 'highway')
+                            fprintf('    highway: %s\n', value.highway);
+                        end
+                    else
+                        fprintf('  %s: %s\n', field, mat2str(value));
+                    end
+                end
+            end
+        end
         
         % Eleman türlerini say
         node_count = 0;
@@ -53,25 +62,32 @@ try
         relation_count = 0;
         
         for i = 1:length(elements)
-            if strcmp(elements(i).type, 'node')
-                node_count = node_count + 1;
-            elseif strcmp(elements(i).type, 'way')
-                way_count = way_count + 1;
-            elseif strcmp(elements(i).type, 'relation')
-                relation_count = relation_count + 1;
+            element = elements{i};  % Cell array'den struct'ı al
+            if isstruct(element) && isfield(element, 'type')
+                switch element.type
+                    case 'node'
+                        node_count = node_count + 1;
+                    case 'way'
+                        way_count = way_count + 1;
+                    case 'relation'
+                        relation_count = relation_count + 1;
+                end
             end
         end
         
-        fprintf('Bulunan node sayısı: %d\n', node_count);
-        fprintf('Bulunan way sayısı: %d\n', way_count);
-        fprintf('Bulunan relation sayısı: %d\n\n', relation_count);
+        fprintf('\nBulunan elemanlar:\n');
+        fprintf('Node sayısı: %d\n', node_count);
+        fprintf('Way sayısı: %d\n', way_count);
+        fprintf('Relation sayısı: %d\n\n', relation_count);
         
         % Yol türlerini analiz et
         if way_count > 0
             highway_types = struct();
             for i = 1:length(elements)
-                if strcmp(elements(i).type, 'way') && isfield(elements(i), 'tags') && isfield(elements(i).tags, 'highway')
-                    highway_type = elements(i).tags.highway;
+                element = elements{i};  % Cell array'den struct'ı al
+                if isstruct(element) && strcmp(element.type, 'way') && ...
+                   isfield(element, 'tags') && isfield(element.tags, 'highway')
+                    highway_type = element.tags.highway;
                     if isfield(highway_types, highway_type)
                         highway_types.(highway_type) = highway_types.(highway_type) + 1;
                     else
@@ -88,34 +104,12 @@ try
             end
         end
         
-        % Trafik yoğunluğunu hesapla
-        fprintf('\nTrafik yoğunluğu hesaplanıyor...\n');
-        % Ana işleme fonksiyonunu doğrudan çağırıyoruz
-        addpath('..');  % Ana dizine path ekle
-        [full_path, ~, ~] = fileparts(mfilename('fullpath'));
-        old_dir = pwd;
-        cd('..');  % Ana dizine geç
-        
-        try
-            traffic_data_output = traffic_data();
-            cd(old_dir);  % Eski dizine geri dön
-            
-            fprintf('\nHesaplanan trafik yoğunlukları:\n');
-            fprintf('Kuzey: %.2f\n', traffic_data_output.north_density);
-            fprintf('Güney: %.2f\n', traffic_data_output.south_density);
-            fprintf('Doğu: %.2f\n', traffic_data_output.east_density);
-            fprintf('Batı: %.2f\n', traffic_data_output.west_density);
-            fprintf('Hesaplama zamanı: %s\n', traffic_data_output.timestamp);
-            
-            % Başarılı test mesajı
-            fprintf('\n=== Overpass API testi BAŞARILI ===\n');
-            fprintf('Trafik verilerine erişim sağlandı ve yoğunluk hesaplandı.\n');
-        catch e
-            cd(old_dir);  % Hata durumunda da eski dizine dönmeyi unutma
-            fprintf('\nTraffic_data fonksiyonu hatası: %s\n', e.message);
-        end
+        fprintf('\n=== Overpass API testi BAŞARILI ===\n');
     else
         fprintf('API yanıtı beklenen formatta değil.\n');
+        % Debug için yanıt yapısını göster
+        fprintf('\nYanıt yapısı:\n');
+        disp(response);
     end
     
 catch e
