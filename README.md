@@ -1,106 +1,132 @@
-# KONTROL PROJE: Adaptif PID Kontrollü Trafik Işığı Simülasyonu
+# Trafik Işığı Simülasyonu ve PID Kontrolcüsü
 
-Bu proje, MATLAB ve Simulink kullanılarak geliştirilmiş bir adaptif trafik ışığı kontrol sistemi simülasyonudur. Sistem, trafik yoğunluğuna göre yeşil ışık sürelerini dinamik olarak ayarlamak için PID kontrolcülerini kullanır. Proje, hem bir Simulink modeli (`traffic_model.slx`) aracılığıyla temel bir tek yönlü kuyruk ve ışık sistemini hem de daha kapsamlı, dört yönlü bir kavşağı simüle eden bir MATLAB betiğini (`main_simulation.m`) içerir.
+Bu proje, PID kontrol algoritması ile çalışan akıllı bir trafik ışığı simülasyon sistemi içermektedir. Sistem, MATLAB ve Simulink kullanarak trafik akışını modellemekte ve optimize etmektedir.
 
-## Projenin Amacı
+## Proje Hakkında
 
-Bu projenin temel amacı, trafik akışını optimize etmek, bekleme sürelerini azaltmak ve kavşak verimliliğini artırmak için adaptif bir trafik ışığı kontrol stratejisi geliştirmek ve simüle etmektir.
+Bu sistem şunları içerir:
+- Adaptif trafik ışığı kontrolcüsü
+- PID tabanlı zamanlama algoritması
+- Trafik yoğunluğu simülasyonu
+- Gerçek zamanlı trafik verileri için API entegrasyonu
+- Performans metrikleri ve görselleştirme araçları
 
-## Bileşenler
+## Dosya Yapısı
 
-Proje iki ana simülasyon yaklaşımı sunar:
+```
+Kontrol_Proje/
+├── config.m                    # Yapılandırma ayarları
+├── run_config.m                # Kolay yapılandırma arayüzü 
+├── create_simulink_model.m     # Simulink modeli oluşturma
+├── create_stateflow_chart.m    # Stateflow diyagramı oluşturma
+├── create_traffic_controller.m # Trafik kontrolcüsü oluşturma
+├── create_traffic_model.m      # Trafik modeli oluşturma
+├── initialize_parameters.m     # Simülasyon parametreleri
+├── main_simulation.m           # Ana simülasyon dosyası
+├── src/                        # Kaynak kod klasörü
+│   ├── api/                    # API entegrasyonları
+│   │   └── traffic_data.m      # Trafik veri kaynakları
+│   ├── control/                # Kontrol algoritmaları
+│   │   ├── pid_controller.m    # PID kontrolcüsü
+│   │   └── update_light_state.m # Işık durumu güncelleme
+│   ├── metrics/                # Metrik hesaplamaları
+│   │   └── record_metrics.m    # Metrikleri kaydetme
+│   └── traffic/                # Trafik modelleme
+│       ├── calculate_density.m # Trafik yoğunluğu hesaplama
+│       ├── generate_vehicles.m # Araç oluşturma
+│       └── move_vehicles.m     # Araç hareketlerini simüle etme
+├── test/                       # Test scriptleri
+│   └── test_overpass_api.m     # API entegrasyonunu test et
+└── utils/                      # Yardımcı fonksiyonlar
+    ├── plot_metrics.m          # Metrikleri görselleştirme
+    └── visualize_intersection.m # Kavşağı görselleştirme
+```
 
-1.  **`create_traffic_model.m` ile oluşturulan Simulink Modeli (`traffic_model.slx`):**
-    *   Tek bir trafik yönü için araç gelişlerini, kuyruk oluşumunu ve temel bir trafik ışığı kontrolünü (Stateflow ile) simüle eder.
-    *   Kuyruk uzunluğunu hedef bir değerde tutmak için bir PID kontrolcü içerir.
-    *   Simülasyon sonuçlarını (kuyruk uzunluğu, bekleme süresi vb.) Simulink Scope blokları üzerinden görselleştirir.
+## Başlangıç
 
-2.  **`main_simulation.m` MATLAB Betiği:**
-    *   Dört yönlü bir kavşak (Kuzey, Güney, Doğu, Batı) için daha ayrıntılı bir simülasyon yürütür.
-    *   Her yönden gelen araçları, oluşan kuyrukları ve trafik ışığı döngülerini yönetir.
-    *   Kuzey-Güney ve Doğu-Batı yönleri için ayrı PID kontrolcüleri kullanarak trafik yoğunluğuna göre yeşil ışık sürelerini adaptif olarak ayarlar.
-    *   Simülasyon sırasında ve sonunda çeşitli performans metriklerini (ortalama bekleme süresi, maksimum kuyruk uzunluğu, geçen toplam araç sayısı) hesaplar ve gösterir.
-    *   Simülasyonu ve metrikleri görselleştirmek için iki ayrı MATLAB figürü oluşturur.
+1. Kolay başlangıç için `run_config.m` dosyasını çalıştırın:
+   ```matlab
+   run('run_config.m')
+   ```
+   Bu komut interaktif bir yapılandırma arayüzü açacaktır.
 
-## Kurulum ve Çalıştırma
+2. Veya manuel olarak `config.m` dosyasını düzenleyin ve çalıştırın:
+   ```matlab
+   run('config.m')
+   ```
 
-### Gereksinimler
+3. `main_simulation.m` dosyasını çalıştırarak simülasyonu başlatın:
+   ```matlab
+   run('main_simulation.m')
+   ```
 
-*   MATLAB
-*   Simulink
-*   Stateflow (Simulink modeli için)
+## API Entegrasyonu
 
-### Çalıştırma Adımları
+Sistem, trafik verilerini gerçek zamanlı olarak almak için çeşitli API'leri desteklemektedir:
 
-#### 1. Simulink Modeli (`traffic_model.slx`)
+1. **Overpass API** (Ücretsiz, API anahtarı gerektirmez)
+   - OpenStreetMap verilerine erişim sağlar
+   - Hiçbir ücret ödemeden kullanılabilir
+   - Yol verilerinden trafik yoğunluğu hesaplanır
 
-Bu model, tek bir yöndeki trafik ışığı ve kuyruk sistemini simüle eder.
+2. **OpenStreetMap API**
+   - Temel harita verileri için kullanılabilir
+   - Ücretsizdir ancak kullanım sınırlamaları vardır
 
-1.  **Modeli Oluşturma:**
-    MATLAB komut satırına aşağıdaki komutu yazın:
-    ```matlab
-    create_traffic_model
-    ```
-    Bu komut, proje dizininde `traffic_model.slx` adlı Simulink model dosyasını oluşturacaktır. Komut tamamlandığında konsolda "Simulink modeli başarıyla oluşturuldu!" mesajını göreceksiniz.
+3. **TomTom API** (API anahtarı gerektirir)
+   - Daha detaylı trafik verileri sunar
+   - Ücretli bir hizmettir ve API anahtarı gerektirir
 
-2.  **Modeli Açma (İsteğe Bağlı):**
-    ```matlab
-    open_system('traffic_model')
-    ```
+### Overpass API Kullanımı
 
-3.  **Simülasyonu Başlatma:**
-    ```matlab
-    sim('traffic_model')
-    ```
-    Bu komut simülasyonu başlatacaktır.
+Overpass API kullanmak için (`run_config.m` ile ya da doğrudan `config.m` dosyasında):
 
-    **Beklenen Simulink Çıktıları:**
-    Simülasyon çalışırken veya bittikten sonra `traffic_model/Visualization` alt sistemindeki Scope blokları açılacaktır. Bu grafiklerde şunları gözlemleyebilirsiniz:
-    *   **Kuyruk Uzunluğu (Queue Length):** Zamanla değişen araç kuyruğunun uzunluğunu gösterir.
-    *   **Bekleme Süresi (Wait Time):** Araçların kuyrukta geçirdiği tahmini ortalama bekleme süresini gösterir.
-    *   **Trafik Işığı Sinyali:** Trafik ışığının (örneğin kırmızı/yeşil) durumunu gösteren bir sinyal.
-    *   **PID Kontrol Sinyali:** PID kontrolcünün ürettiği ve muhtemelen ışık zamanlamasını etkileyen kontrol sinyalini gösterir.
+```matlab
+configuration.use_overpass = true;
+configuration.overpass_radius = 500; % Kavşak çevresindeki yarıçap (metre)
+config = configuration;
+save('config.mat', 'config');
+```
 
-    *Örnek Çıktı Görünümleri (Simulink Scope'ları):*
-    *(Buraya Simulink Scope'larından alınmış örnek ekran görüntüleri veya çizimlerini ekleyebilirsiniz. Örneğin, kuyruk uzunluğunun zamanla nasıl değiştiğini gösteren bir grafik.)*
-    *   **Kuyruk Uzunluğu Grafiği:** Genellikle zaman ekseninde dalgalanan bir çizgi olarak görülür; araç geldikçe artar, araçlar geçtikçe azalır.
-    *   **Bekleme Süresi Grafiği:** Kuyruk uzunluğuyla orantılı olarak artıp azalır.
+API entegrasyonunu test etmek için:
 
-#### 2. Kapsamlı Kavşak Simülasyonu (`main_simulation.m`)
+```matlab
+cd test
+run('test_overpass_api.m')
+```
 
-Bu betik, dört yönlü bir kavşağı daha detaylı simüle eder ve kendi görselleştirmelerini üretir.
+## Simülasyon Parametreleri
 
-1.  **Simülasyonu Başlatma:**
-    MATLAB komut satırına aşağıdaki komutu yazın:
-    ```matlab
-    main_simulation
-    ```
-    Betik çalışmaya başladığında konsolda "Trafik Işığı Simülasyonu Başlatılıyor..." mesajını ve ardından simülasyon adımlarına dair bilgileri göreceksiniz.
+Simülasyon parametrelerini `initialize_parameters.m` dosyasında ayarlayabilirsiniz:
 
-    **Beklenen `main_simulation.m` Çıktıları:**
-    Betik çalıştırıldığında iki ana pencere (figure) açılacaktır:
+- Işık süreleri
+- Trafik oluşturma oranları
+- PID parametreleri
+- Simülasyon süresi
 
-    *   **Pencere 1: "Trafik Işığı Kavşağı"**
-        *   Bu pencerede, dört yönlü kavşağın anlık durumu şematik olarak gösterilir.
-        *   Her yöndeki araç kuyrukları (muhtemelen basit şekillerle veya sayılarla) ve aktif olan trafik ışıkları (renklerle) görselleştirilir.
-        *   Simülasyon ilerledikçe bu görsel dinamik olarak güncellenir.
+## Görselleştirme
 
-        *Örnek Çıktı Görünümü (Kavşak Figürü):*
-        *(Buraya `visualize_intersection` fonksiyonunun ürettiği kavşak görselinin bir örneğini ekleyebilirsiniz. Dört kolu olan bir kavşak, her kolda bekleyen araçları temsil eden noktalar/çubuklar ve ışıkların rengi.)*
+Simülasyon iki görselleştirme penceresi gösterir:
+1. Trafik ışığı kavşağı animasyonu
+2. Kuyruk uzunlukları ve ortalama bekleme süresi grafikleri
 
-    *   **Pencere 2: "Trafik Işığı Simülasyonu" (Metrik Grafikleri)**
-        *   Bu pencerede, simülasyon boyunca toplanan önemli performans metriklerinin zaman içindeki değişimi grafiklerle gösterilir.
-        *   **Kuyruk Uzunlukları:** Genellikle dört yön (Kuzey, Güney, Doğu, Batı) için ayrı çizgilerle zamanla değişen kuyruk uzunlukları.
-        *   **Ortalama Bekleme Süreleri:** Dört yön için zamanla değişen ortalama bekleme süreleri.
-        *   **Işık Süreleri:** NS (Kuzey-Güney) yeşil, EW (Doğu-Batı) yeşil ve sarı ışık sürelerinin zaman içindeki değişimi (PID kontrolcüsünün adaptif ayarlamalarını yansıtır).
+## Geliştirme
 
-        *Örnek Çıktı Görünümü (Metrik Grafikleri Figürü):*
-        *(Buraya `plot_metrics` fonksiyonunun ürettiği grafiklerin bir örneğini ekleyebilirsiniz. Üç alt grafikten oluşan bir figür: biri kuyruk uzunlukları, biri bekleme süreleri, biri de ışık süreleri için.)*
+Yeni özellikler eklemek için, ilgili modülleri genişletebilirsiniz:
+- Yeni trafik senaryoları için `src/traffic/` klasörü
+- Yeni kontrol algoritmaları için `src/control/` klasörü
+- Yeni API entegrasyonları için `src/api/` klasörü
 
-    Simülasyon tamamlandığında, konsolda aşağıdaki gibi özet performans metrikleri de yazdırılacaktır:
-    ```
-    Performans Metrikleri:
-    Toplam geçen araç: [sayı]
-    Ortalama bekleme süreleri (K,G,D,B): [süre], [süre], [süre], [süre] saniye
-    Maksimum kuyruk uzunlukları (K,G,D,B): [araç sayısı], [araç sayısı], [araç sayısı], [araç sayısı] araç
-    ```
+## Sorun Giderme
+
+- **config.m hataları**: İsim çakışmasını önlemek için daima `configuration` yapısını kullanın ve en son `config = configuration` ile kaydedin.
+- **API hataları**: İnternet bağlantınızı kontrol edin ve `test/test_overpass_api.m` ile API'yi test edin.
+- **Simulink hataları**: MATLAB sürümünüz ile uyumu kontrol edin.
+
+---
+
+## Katkıda Bulunanlar
+- [İsminizi buraya ekleyin]
+
+## Lisans
+Tüm hakları saklıdır © 2023

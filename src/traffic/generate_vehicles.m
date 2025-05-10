@@ -15,6 +15,46 @@ south_rate_field = ['South_' current_arrival_profile];
 east_rate_field = ['East_' current_arrival_profile];
 west_rate_field = ['West_' current_arrival_profile];
 
+% API verilerini kullan (config'de tanımlanmışsa)
+try
+    % Config dosyasını yükle - yalnızca API ayarları için
+    if exist('config.mat', 'file')
+        load('config.mat');
+        
+        % API seçeneği etkinleştirildi mi kontrol et
+        if isfield(config, 'use_overpass') && config.use_overpass || ...
+           isfield(config, 'use_osm') && config.use_osm || ...
+           isfield(config, 'use_tomtom') && config.use_tomtom
+            
+            % API güncelleştirme aralığını kontrol et
+            persistent last_api_update;
+            persistent api_traffic_data;
+            
+            if isempty(last_api_update) || ...
+               (current_time - last_api_update >= config.api_update_interval)
+                % API'den trafik verilerini al
+                api_traffic_data = get_traffic_data();
+                last_api_update = current_time;
+                fprintf('API verileri güncellendi: Zaman = %d saniye\n', current_time);
+            end
+            
+            % API verisini kullanarak varış oranlarını ölçeklendir
+            if ~isempty(api_traffic_data)
+                % Trafik yoğunluğu değerlerini kullanarak varış oranlarını ölçeklendirme
+                arrival_rates.(north_rate_field) = arrival_rates.(north_rate_field) * api_traffic_data.north_density * 2;
+                arrival_rates.(south_rate_field) = arrival_rates.(south_rate_field) * api_traffic_data.south_density * 2;
+                arrival_rates.(east_rate_field) = arrival_rates.(east_rate_field) * api_traffic_data.east_density * 2;
+                arrival_rates.(west_rate_field) = arrival_rates.(west_rate_field) * api_traffic_data.west_density * 2;
+                fprintf('Varış oranları API verisine göre ayarlandı - K:%.3f G:%.3f D:%.3f B:%.3f\n', ...
+                    arrival_rates.(north_rate_field), arrival_rates.(south_rate_field), ...
+                    arrival_rates.(east_rate_field), arrival_rates.(west_rate_field));
+            end
+        end
+    end
+catch e
+    warning('API verisi kullanılırken hata oluştu: %s\nVarsayılan varış oranları kullanılıyor.', e.message);
+end
+
 % Custom Poisson distribution implementation
 % For small lambda values, we can use the direct method
 function n = custom_poisson(lambda)
@@ -51,4 +91,4 @@ if new_vehicles_north > 0 || new_vehicles_south > 0 || new_vehicles_east > 0 || 
         new_vehicles_north, new_vehicles_south, new_vehicles_east, new_vehicles_west);
 end
 
-end 
+end
