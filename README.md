@@ -9,7 +9,7 @@ Bu proje, kavşaklardaki trafik akışını simüle etmek ve trafik ışıkları
 * Trafik ışığı zamanlamalarını dinamik olarak ayarlayan PID kontrolcü
 * Kavşak durumu ve performans metrikleri için gerçek zamanlı görselleştirme
 * Programatik olarak oluşturulan Simulink modeli (`.slx`)
-* MATLAB R2019b-R2023b ve sonraki sürümlerle uyumlu yapı
+* MATLAB R2024b için özel olarak tasarlanmış yapı
 
 ## Proje Yapısı
 
@@ -38,20 +38,19 @@ Projenin dosya ve klasör yapısı:
 
 ### Gereksinimler
 
-* MATLAB R2019b veya daha yeni sürüm
+* MATLAB R2024b
 * Simulink
+* Control System Toolbox
 * İnternet bağlantısı (API kullanımı için)
 
-### MATLAB Sürüm Uyumluluğu
+### MATLAB R2024b Özellikleri
 
-> **ÖNEMLİ:** Bu proje, MATLAB sürüm farklılıklarına otomatik uyum sağlar:
+> **ÖNEMLİ:** Bu proje, MATLAB R2024b'nin özelliklerini kullanmaktadır:
 > 
-> **MATLAB R2023b** ve sonrası için:
-> * `Random Number` bloğu yerine `Uniform Random Number` bloğu kullanılmaktadır
-> * `Switch` bloğunda `u2~=0` veya `u2>0` formatı doğrudan kullanılmaktadır
-> * `Compare To Zero` bloğunda güncel parametreler kullanılmaktadır
-> 
-> Bu değişiklikler kodda otomatik olarak uygulanmıştır ve farklı sürümlerle sorunsuz çalışır.
+> * `Uniform Random Number` bloğu kullanılmaktadır
+> * `Switch` bloğunda `u2~=0` formatı kullanılmaktadır
+> * `Relational Operator` bloğu kullanılarak sıfırla karşılaştırma yapılmaktadır
+> * Modern Simulink blok parametreleri ve bağlantı API'leri kullanılmaktadır
 
 ### Çalıştırma Adımları
 
@@ -67,11 +66,11 @@ Projenin dosya ve klasör yapısı:
    ```
    Tam simülasyonu başlatır ve görsel çıktılar sağlar.
 
-3. **Simulink Modeli Oluşturma (İsteğe Bağlı):**
+3. **Simulink Modeli Oluşturma:**
    ```matlab
    run('create_traffic_model.m')
    ```
-   `traffic_model.slx` dosyasını oluşturur.
+   `traffic_light_model.slx` dosyasını oluşturur.
 
 4. **API Testi (İsteğe Bağlı):**
    ```matlab
@@ -83,8 +82,8 @@ Projenin dosya ve klasör yapısı:
 ## Mevcut Durum
 
 * **API Entegrasyonu:** Overpass API entegrasyonu tamamlanmış, veri işleme sorunları çözülmüştür.
-* **İki Modül:** Script-tabanlı (`main_simulation.m`) ve model-tabanlı (`traffic_model.slx`) simülasyonlar ayrı modüllerde çalışmaktadır.
-* **MATLAB Uyumluluğu:** R2019b'den R2023b'ye kadar tüm MATLAB sürümleriyle uyumludur.
+* **İki Modül:** Script-tabanlı (`main_simulation.m`) ve model-tabanlı (`traffic_light_model.slx`) simülasyonlar ayrı modüllerde çalışmaktadır.
+* **MATLAB Uyumluluğu:** Bu proje özellikle MATLAB R2024b için optimize edilmiştir.
 
 ## Gelecek Geliştirmeler
 
@@ -97,9 +96,9 @@ Projenin dosya ve klasör yapısı:
 
 ## Sorun Giderme
 
+* **MATLAB Sürüm Uyumluluğu:** Bu proje sadece MATLAB R2024b ile çalışmak üzere tasarlanmıştır, diğer sürümlerde çalıştırmak için script'lerin güncellenmesi gerekebilir
 * **API Bağlantı Hatası:** Internet bağlantınızı kontrol edin veya `config.m` dosyasından alternatif API URL'sini yapılandırın
-* **Simulink Model Hatası:** MATLAB sürümünüzün uyumluluğunu doğrulayın, gerekirse `create_traffic_model.m` scriptini tekrar çalıştırın
-* **Bellek Sorunları:** Büyük kavşak senaryolarında `initialize_parameters.m` içindeki `MAX_VEHICLES` değerini düşürmeyi deneyin
+* **Model Oluşturma Hataları:** `create_traffic_model.m` dosyasındaki modül parametrelerini ve bağlantıları kontrol edin
 
 ## Katkıda Bulunanlar
 
@@ -111,4 +110,4 @@ Projenin dosya ve klasör yapısı:
 
 ---
 
-Son Güncelleme: Mart 2023
+Son Güncelleme: Mayıs 2024

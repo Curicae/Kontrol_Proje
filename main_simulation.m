@@ -53,11 +53,23 @@ next_green_duration_EW = base_green_duration;
 average_wait_times_over_time = zeros(total_simulation_duration / time_step_size, 4);
 queue_lengths_over_time = zeros(total_simulation_duration / time_step_size, 4);
 light_durations_over_time = zeros(total_simulation_duration / time_step_size, 3);
+log_api_densities = zeros(total_simulation_duration / time_step_size, 2); % API verilerini saklamak için
 total_vehicles_passed = 0;
 
 % Data logging for visualization
 log_time = zeros(1, total_simulation_duration / time_step_size);
 log_vehicle_queues_north = zeros(1, total_simulation_duration / time_step_size);
+
+% Overpass API konfigürasyonunu yükle
+try
+    fprintf('API yapılandırması yükleniyor...\n');
+    config_data = load('config.mat');
+    fprintf('API yapılandırması yüklendi: %s koordinatları kullanılacak.\n', ...
+        [num2str(config_data.configuration.intersection_location.lat), ', ', ...
+         num2str(config_data.configuration.intersection_location.long)]);
+catch config_error
+    fprintf('API yapılandırması yüklenemedi, yerel trafik hesaplamaları kullanılacak.\n');
+end
 
 % Görselleştirme pencerelerini oluştur
 h_fig_intersection = figure('Name', 'Kavşak Görselleştirmesi', 'NumberTitle', 'off', 'Position', [100, 300, 600, 500]);
@@ -88,9 +100,26 @@ for t = 1:time_step_size:total_simulation_duration
     
     fprintf('  Işık durumları güncellendi. Mevcut durum: %s, Süre: %.1f s\n', current_light_state, time_in_current_state);
 
-    % 3. Trafik Yoğunluğunu Hesapla
-    [density_NS, density_EW] = calculate_density(vehicle_queues, approaching_vehicle_time_window, current_light_state);
-    fprintf('  Trafik yoğunlukları hesaplandı. NS: %.2f, EW: %.2f\n', density_NS, density_EW);
+    % 2. Overpass API'den gerçek trafik yoğunluğunu al
+        try
+            % API'den trafik verisini al
+            api_traffic_data = traffic_data();
+        
+            % API'den gelen trafik yoğunluklarını kullan
+            density_NS = (api_traffic_data.north_density + api_traffic_data.south_density) / 2;
+            density_EW = (api_traffic_data.east_density + api_traffic_data.west_density) / 2;
+        
+            fprintf('  API veri alındı. Gerçek trafik yoğunlukları kullanılıyor.\n');
+        catch api_error
+            % API çalışmazsa ya da hata verirse, hesaplanan yoğunlukları kullan
+            [density_NS, density_EW] = calculate_density(vehicle_queues, approaching_vehicle_time_window, current_light_state);
+            fprintf('  API hatası, hesaplanan trafik yoğunlukları kullanılıyor.\n');
+        end
+        fprintf('  Trafik yoğunlukları hesaplandı. NS: %.2f, EW: %.2f\n', density_NS, density_EW);
+    
+        % API verilerini loglama
+        log_api_densities(t / time_step_size, 1) = density_NS;
+        log_api_densities(t / time_step_size, 2) = density_EW;
 
     % 4. PID Kontrolcü ile Yeşil Işık Süresini Ayarla
     if phase_changed
@@ -174,6 +203,17 @@ fprintf('Maksimum kuyruk uzunlukları (K,G,D,B): %d, %d, %d, %d araç\n', ...
 figure(h_fig_metrics); % Metrik figürünü aktif et
 plot_metrics(queue_lengths_over_time, average_wait_times_over_time, light_durations_over_time, ...
             time_step_size, total_simulation_duration / time_step_size, current_light_state);
+            
+% API verilerini de görselleştir
+figure('Name', 'API Trafik Yoğunlukları', 'NumberTitle', 'off', 'Position', [100, 100, 600, 400]);
+plot(1:time_step_size:total_simulation_duration, log_api_densities(:,1), 'b-', 'LineWidth', 2);
+hold on;
+plot(1:time_step_size:total_simulation_duration, log_api_densities(:,2), 'r-', 'LineWidth', 2);
+title('API''den Alınan Trafik Yoğunlukları');
+xlabel('Zaman (saniye)');
+ylabel('Trafik Yoğunluğu');
+legend('Kuzey-Güney', 'Doğu-Batı');
+grid on;
              
 fprintf('Sonuçlar grafiklendi.\n');
 fprintf('Simülasyon Sonlandı.\n');
