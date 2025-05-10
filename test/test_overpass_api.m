@@ -8,150 +8,153 @@ close all;
 fprintf('Overpass API test başlatılıyor...\n');
 
 % Klasör yapısını kontrol et ve gerekirse ekle
-addpath('../src/api');
-fprintf('API modülleri eklendi\n');
+addpath('..'); % Proje kök dizinini ekle
+% addpath('../src'); % Bu satır uyarı veriyordu, kök dizin yeterli olmalı
+fprintf('Gerekli yollar eklendi\n');
 
-% Config dosyasını oluştur
-configuration = struct();
-configuration.intersection_location = struct(...
+% Temel test yapılandırmasını oluştur
+base_configuration = struct();
+base_configuration.intersection_location = struct(...
     'lat', 41.0370, ...  % Taksim Meydanı
     'long', 28.9850 ...
 );
-configuration.api_update_interval = 300;
-configuration.use_osm = false;
-configuration.use_tomtom = false;
-configuration.use_overpass = true;
-configuration.overpass_radius = 500; % metre cinsinden yarıçap
+base_configuration.api_update_interval = 300;
+base_configuration.use_osm = false;
+base_configuration.use_tomtom = false;
+base_configuration.use_overpass = true;
+base_configuration.overpass_radius = 500; % metre cinsinden yarıçap
+base_configuration.google_maps_api_key = 'YOUR_TEST_GOOGLE_KEY'; 
+base_configuration.tomtom_api_key = 'YOUR_TEST_TOMTOM_KEY';
 
-% Config'i değişkene kaydet
-config = configuration;
-
-% Test config'i dosyaya kaydet
-save('config_temp.mat', 'config');
-
-% Orijinal config dosyasını yedekle
+% Orijinal config dosyasını yedekle ve test config'i hazırla
+original_config_exists = false;
 if exist('../config.mat', 'file')
+    original_config_exists = true;
     copyfile('../config.mat', '../config_backup.mat');
     fprintf('Orijinal config yedeklendi\n');
 end
 
-% Test config'i kopyala
-copyfile('config_temp.mat', '../config.mat');
-fprintf('Test config dosyası oluşturuldu\n');
+% Her test adımı için kullanılacak anlık yapılandırma
+current_test_configuration = base_configuration;
+save('../config.mat', 'current_test_configuration'); % Ana config.mat'e 'current_test_configuration' adıyla kaydet
+                                                 % traffic_data.m bunu 'configuration' olarak bekliyor.
+                                                 % Bu satırı düzeltmemiz LAZIM.
+% DOĞRUSU: 
+configuration_to_save = base_configuration; % Geçici bir adla değil, doğrudan 'configuration' adıyla kaydedelim
+save('../config.mat', 'configuration_to_save'); 
+% YADA DAHA İYİSİ, traffic_data.m'nin beklediği gibi 'configuration' adında bir değişkeni kaydetmek:
+configuration = base_configuration; % 'configuration' adında bir struct oluştur
+save('../config.mat', 'configuration'); % 'configuration' struct'ını 'configuration' adıyla kaydet
+fprintf('Test için config.mat dosyası (Taksim) oluşturuldu/güncellendi\n');
 
 try
-    % traffic_data modülünü test et
-    fprintf('\n1. Overpass API çağrısı yapılıyor...\n');
-    traffic_data = get_traffic_data();
+    % 1. Overpass API çağrısı (Taksim)
+    fprintf('\n1. Overpass API çağrısı yapılıyor (Taksim)...\n');
+    api_result1 = traffic_data();
+    fprintf('API Sonuçları (Konum 1 - Taksim):\n');
+    if isstruct(api_result1) && isfield(api_result1, 'north_density')
+        fprintf('- Kuzey:%.2f, Güney:%.2f, Doğu:%.2f, Batı:%.2f @ %s\n', api_result1.north_density, api_result1.south_density, api_result1.east_density, api_result1.west_density, char(api_result1.timestamp));
+    else
+        fprintf('Hatalı veya eksik API sonucu (Taksim)\n');
+    end
+
+    % 2. Farklı bir kavşak (Sultanahmet)
+    fprintf('\n2. Overpass API çağrısı yapılıyor (Sultanahmet)...\n');
+    configuration_sultanahmet = base_configuration;
+    configuration_sultanahmet.intersection_location.lat = 41.0082;
+    configuration_sultanahmet.intersection_location.long = 28.9784;
+    configuration_sultanahmet.overpass_radius = 300;
+    save('../config.mat', 'configuration_sultanahmet'); % 'configuration_sultanahmet' adıyla kaydeder
+    % DOĞRUSU:
+    configuration = configuration_sultanahmet; % Ana 'configuration' struct'ını güncelle
+    save('../config.mat', 'configuration');     % 'configuration' adıyla kaydet
     
-    % Sonuçları görüntüle
-    fprintf('\nAPI Sonuçları:\n');
-    fprintf('- Kuzey Trafik Yoğunluğu: %.2f\n', traffic_data.north_density);
-    fprintf('- Güney Trafik Yoğunluğu: %.2f\n', traffic_data.south_density);
-    fprintf('- Doğu Trafik Yoğunluğu: %.2f\n', traffic_data.east_density);
-    fprintf('- Batı Trafik Yoğunluğu: %.2f\n', traffic_data.west_density);
-    fprintf('- Zaman Damgası: %s\n', char(traffic_data.timestamp));
-    
-    % Farklı bir kavşak konumu test et
-    fprintf('\n2. Farklı bir kavşak için test ediliyor...\n');
-    configuration.intersection_location = struct(...
-        'lat', 41.0082, ...  % Sultanahmet Meydanı
-        'long', 28.9784 ...
-    );
-    configuration.overpass_radius = 300; % Daha küçük yarıçap
-    config = configuration;
-    save('../config.mat', 'config'); % Güncelle
-    
-    traffic_data2 = get_traffic_data();
-    
-    % 2. sonuçları görüntüle
-    fprintf('\nİkinci Konum API Sonuçları:\n');
-    fprintf('- Kuzey Trafik Yoğunluğu: %.2f\n', traffic_data2.north_density);
-    fprintf('- Güney Trafik Yoğunluğu: %.2f\n', traffic_data2.south_density);
-    fprintf('- Doğu Trafik Yoğunluğu: %.2f\n', traffic_data2.east_density);
-    fprintf('- Batı Trafik Yoğunluğu: %.2f\n', traffic_data2.west_density);
-    fprintf('- Zaman Damgası: %s\n', char(traffic_data2.timestamp));
-    
-    fprintf('\n3. Başka bir API seçeneğini test ediliyor (OSM)...\n');
-    configuration.use_overpass = false;
-    configuration.use_osm = true;
-    config = configuration;
-    save('../config.mat', 'config'); % Güncelle
-    
-    traffic_data3 = get_traffic_data();
-    
-    % 3. sonuçları görüntüle
-    fprintf('\nOSM API Sonuçları (varsayılan değerler bekleniyor):\n');
-    fprintf('- Kuzey Trafik Yoğunluğu: %.2f\n', traffic_data3.north_density);
-    fprintf('- Güney Trafik Yoğunluğu: %.2f\n', traffic_data3.south_density);
-    fprintf('- Doğu Trafik Yoğunluğu: %.2f\n', traffic_data3.east_density);
-    fprintf('- Batı Trafik Yoğunluğu: %.2f\n', traffic_data3.west_density);
-    
-    % Overpass API'nin performansını test et
-    fprintf('\n4. API yanıt süresi testi yapılıyor...\n');
-    configuration.use_overpass = true;
-    configuration.use_osm = false;
-    config = configuration;
-    save('../config.mat', 'config'); % Güncelle
-    
+    api_result2 = traffic_data();
+    fprintf('API Sonuçları (Konum 2 - Sultanahmet):\n');
+    if isstruct(api_result2) && isfield(api_result2, 'north_density')
+        fprintf('- Kuzey:%.2f, Güney:%.2f, Doğu:%.2f, Batı:%.2f @ %s\n', api_result2.north_density, api_result2.south_density, api_result2.east_density, api_result2.west_density, char(api_result2.timestamp));
+    else
+        fprintf('Hatalı veya eksik API sonucu (Sultanahmet)\n');
+    end
+
+    % 3. OSM API testi
+    fprintf('\n3. OSM API çağrısı yapılıyor (varsayılan dönmeli)...\n');
+    configuration_osm = base_configuration;
+    configuration_osm.use_overpass = false;
+    configuration_osm.use_osm = true;
+    save('../config.mat', 'configuration_osm'); % 'configuration_osm' adıyla kaydeder
+    % DOĞRUSU:
+    configuration = configuration_osm; % Ana 'configuration' struct'ını güncelle
+    save('../config.mat', 'configuration'); % 'configuration' adıyla kaydet
+
+    api_result3 = traffic_data();
+    fprintf('OSM API Sonuçları (varsayılan değerler bekleniyor):\n');
+    if isstruct(api_result3) && isfield(api_result3, 'north_density')
+        fprintf('- Kuzey:%.2f, Güney:%.2f, Doğu:%.2f, Batı:%.2f @ %s\n', api_result3.north_density, api_result3.south_density, api_result3.east_density, api_result3.west_density, char(api_result3.timestamp));
+    else
+        fprintf('Hatalı veya eksik API sonucu (OSM)\n');
+    end
+
+    % 4. Overpass API performans testi
+    fprintf('\n4. Overpass API yanıt süresi testi yapılıyor (Taksim)...\n');
+    configuration_perf_test = base_configuration; % Taksim ayarlarını geri yükle
+    save('../config.mat', 'configuration_perf_test'); % 'configuration_perf_test' adıyla kaydeder
+    % DOĞRUSU:
+    configuration = configuration_perf_test; % Ana 'configuration' struct'ını güncelle
+    save('../config.mat', 'configuration');    % 'configuration' adıyla kaydet
+
     tic;
-    get_traffic_data();
+    traffic_data();
     elapsed_time = toc;
     fprintf('Overpass API yanıt süresi: %.2f saniye\n', elapsed_time);
-    
+
     % Config'i geri yükle
-    if exist('../config_backup.mat', 'file')
+    if original_config_exists
         copyfile('../config_backup.mat', '../config.mat');
         fprintf('\nOrijinal config geri yüklendi\n');
+    elseif exist('../config.mat', 'file') % Eğer orijinal yoksa ve test bir config oluşturduysa sil
+        delete('../config.mat');
+        fprintf('\nTest için oluşturulan config.mat silindi.\n');
     end
-    
-    % Grafik oluştur
-    figure('Name', 'Overpass API Trafik Yoğunluğu Karşılaştırması', 'Position', [100, 100, 800, 400]);
-    
-    % Taksim Meydanı ve Sultanahmet için trafik yoğunlukları
-    locations = {'Taksim Meydanı', 'Sultanahmet Meydanı'};
-    
-    % Kuzey trafik yoğunlukları
-    north_data = [traffic_data.north_density, traffic_data2.north_density];
-    south_data = [traffic_data.south_density, traffic_data2.south_density];
-    east_data = [traffic_data.east_density, traffic_data2.east_density];
-    west_data = [traffic_data.west_density, traffic_data2.west_density];
-    
-    % Çubuk grafik
-    subplot(1, 2, 1);
-    bar([north_data; south_data; east_data; west_data]');
-    title('Trafik Yoğunluğu Karşılaştırması');
-    xlabel('Konum');
-    ylabel('Trafik Yoğunluğu');
-    set(gca, 'XTickLabel', locations);
-    legend('Kuzey', 'Güney', 'Doğu', 'Batı', 'Location', 'best');
-    
-    % Pasta grafik (Taksim)
-    subplot(1, 2, 2);
-    pie([traffic_data.north_density, traffic_data.south_density, traffic_data.east_density, traffic_data.west_density]);
-    title('Taksim Meydanı Trafik Dağılımı');
-    legend('Kuzey', 'Güney', 'Doğu', 'Batı', 'Location', 'best');
-    
-    % Grafiği kaydet
-    saveas(gcf, 'overpass_api_test_results.png');
-    fprintf('Test sonuç grafiği kaydedildi: overpass_api_test_results.png\n');
-    
+
+    % Grafik oluştur (api_result1 ve api_result2'yi kullan)
+    if exist('api_result1', 'var') && exist('api_result2', 'var') && isstruct(api_result1) && isstruct(api_result2) && isfield(api_result1, 'north_density') && isfield(api_result2, 'north_density')
+        figure('Name', 'Overpass API Trafik Yoğunluğu Karşılaştırması', 'Position', [100, 100, 800, 400]);
+        locations = {'Taksim Meydanı', 'Sultanahmet Meydanı'};
+        north_data = [api_result1.north_density, api_result2.north_density];
+        south_data = [api_result1.south_density, api_result2.south_density];
+        east_data = [api_result1.east_density, api_result2.east_density];
+        west_data = [api_result1.west_density, api_result2.west_density];
+        subplot(1, 2, 1);
+        bar([north_data; south_data; east_data; west_data]');
+        title('Trafik Yoğunluğu Karşılaştırması'); xlabel('Konum'); ylabel('Trafik Yoğunluğu');
+        set(gca, 'XTickLabel', locations);
+        legend('Kuzey', 'Güney', 'Doğu', 'Batı', 'Location', 'best');
+        subplot(1, 2, 2);
+        pie([api_result1.north_density, api_result1.south_density, api_result1.east_density, api_result1.west_density]);
+        title('Taksim Meydanı Trafik Dağılımı');
+        legend('Kuzey', 'Güney', 'Doğu', 'Batı', 'Location', 'best');
+        saveas(gcf, 'overpass_api_test_results.png');
+        fprintf('Test sonuç grafiği kaydedildi: overpass_api_test_results.png\n');
+    else
+        fprintf('Grafik oluşturmak için yeterli veri yok veya API sonuçları hatalı.\n');
+    end
+
     fprintf('\nOverpass API testi başarıyla tamamlandı!\n');
-    
+
 catch e
-    % Hata durumunda config'i geri yükle ve hatayı göster
-    if exist('../config_backup.mat', 'file')
+    if original_config_exists
         copyfile('../config_backup.mat', '../config.mat');
     end
     fprintf('\nTest sırasında hata oluştu: %s\n', e.message);
-    rethrow(e);
+    fprintf('Hata kaynağı: %s, Satır: %d\n', e.stack(1).file, e.stack(1).line);
 end
 
-% Geçici dosyaları temizle
-if exist('../config_backup.mat', 'file')
+if original_config_exists && exist('../config_backup.mat', 'file')
     delete('../config_backup.mat');
 end
-if exist('config_temp.mat', 'file')
-    delete('config_temp.mat');
-end
+% config_temp.mat silinmişti, tekrar silmeye gerek yok
+% if exist('config_temp.mat', 'file') 
+% delete('config_temp.mat');
+% end
 fprintf('Geçici dosyalar temizlendi\n');

@@ -5,11 +5,24 @@ clear;
 clc;
 close all;
 
-% MATLAB path ayarları
-addpath('src/traffic');
-addpath('src/control');
-addpath('src/metrics');
-addpath('utils');
+% MATLAB yolunu düzenle - API ve diğer dosyalar için
+cur_dir = pwd;
+if strcmp(cur_dir(end-12:end), 'Kontrol_Proje')
+    % Ana dizindeyiz, doğrudan ekle
+    addpath(genpath('src'));
+    addpath('utils');
+    fprintf('Yollar ana dizinden eklendi.\n');
+else
+    % Ana dizinde değiliz, düzelt
+    if exist('Kontrol_Proje', 'dir')
+        cd('Kontrol_Proje');
+        addpath(genpath('src'));
+        addpath('utils');
+        fprintf('Ana dizine geçildi ve yollar eklendi.\n');
+    else
+        error('Lütfen Kontrol_Proje klasörünün içinde çalıştırın.');
+    end
+end
 
 fprintf('Trafik Işığı Simülasyonu Başlatılıyor...\n');
 
@@ -47,13 +60,11 @@ log_time = zeros(1, total_simulation_duration / time_step_size);
 log_vehicle_queues_north = zeros(1, total_simulation_duration / time_step_size);
 
 % Görselleştirme pencerelerini oluştur
-figure('Name', 'Trafik Işığı Kavşağı', 'NumberTitle', 'off', 'Position', [100, 100, 800, 800]);
-figure('Name', 'Trafik Işığı Simülasyonu', 'NumberTitle', 'off', 'Position', [100, 100, 1200, 800]);
+h_fig_intersection = figure('Name', 'Kavşak Görselleştirmesi', 'NumberTitle', 'off', 'Position', [100, 300, 600, 500]);
+h_fig_metrics = figure('Name', 'Performans Metrikleri', 'NumberTitle', 'off', 'Position', [750, 300, 600, 500]);
 
 fprintf('Simülasyon başlatılıyor...\n');
-fprintf('İki görselleştirme penceresi açılacak:\n');
-fprintf('1. Trafik Işığı Kavşağı\n');
-fprintf('2. Metrik Grafikleri\n\n');
+fprintf('İki ayrı görselleştirme penceresi açılacak.\n\n');
 
 % Ana Simülasyon Döngüsü
 for t = 1:time_step_size:total_simulation_duration
@@ -126,18 +137,17 @@ for t = 1:time_step_size:total_simulation_duration
     pause(0.01);
 
     % Her adımda görselleştirme yap
+    
     % Kavşak durumunu görselleştir
-    figure(1);
-    clf; % Mevcut figure'ı temizle
+    figure(h_fig_intersection); % Kavşak figürünü aktif et
     visualize_intersection(vehicle_queues, current_light_state);
     
     % Metrikleri görselleştir
-    figure(2);
-    clf; % Mevcut figure'ı temizle
+    figure(h_fig_metrics); % Metrik figürünü aktif et
     plot_metrics(queue_lengths_over_time(1:t / time_step_size,:), ...
-        average_wait_times_over_time(1:t / time_step_size,:), ...
-        light_durations_over_time(1:t / time_step_size,:), ...
-        time_step_size, t / time_step_size);
+                average_wait_times_over_time(1:t / time_step_size,:), ...
+                light_durations_over_time(1:t / time_step_size,:), ...
+                time_step_size, t / time_step_size, current_light_state);
     
     % Simülasyon durumunu göster
     fprintf('Adım: %d/%d, Geçen Araç: %d\n', t / time_step_size, total_simulation_duration / time_step_size, vehicles_passed_this_step);
@@ -160,19 +170,10 @@ fprintf('Ortalama bekleme süreleri (K,G,D,B): %.2f, %.2f, %.2f, %.2f saniye\n',
 fprintf('Maksimum kuyruk uzunlukları (K,G,D,B): %d, %d, %d, %d araç\n', ...
     max(queue_lengths_over_time));
 
-% 8. Sonuçları Görselleştir
+% 8. Sonuçları Görselleştir - Son görüntü
+figure(h_fig_metrics); % Metrik figürünü aktif et
 plot_metrics(queue_lengths_over_time, average_wait_times_over_time, light_durations_over_time, ...
-            time_step_size, total_simulation_duration / time_step_size);
+            time_step_size, total_simulation_duration / time_step_size, current_light_state);
+             
 fprintf('Sonuçlar grafiklendi.\n');
-
 fprintf('Simülasyon Sonlandı.\n');
-
-% Placeholder for function calls - these will be separate .m files
-% function [queues] = generate_vehicles(queues, time, rates, dt) disp('generate_vehicles called'); end
-% function [lights, changed] = update_light_state(lights, time, phase_dur, yellow_dur, next_g_ns, next_g_ew) changed=false; disp('update_light_state called'); end
-% function [density_ns, density_ew] = calculate_density(queues, approaching_params, lights) density_ns=0; density_ew=0; disp('calculate_density called'); end
-% function [output] = pid_controller(error, gains, prev_error, integral, dt) output=0; disp('pid_controller called'); end
-% function [queues, passed] = move_vehicles(queues, lights, vpsg) passed=0; disp('move_vehicles called'); end
-% function record_metrics(idx, varargin) disp('record_metrics called'); end
-% function metrics_summary = calculate_performance_metrics(varargin) metrics_summary=struct(); disp('calculate_performance_metrics called'); end
-% function plot_metrics(varargin) disp('plot_metrics called'); end 

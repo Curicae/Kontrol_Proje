@@ -19,21 +19,23 @@ west_rate_field = ['West_' current_arrival_profile];
 try
     % Config dosyasını yükle - yalnızca API ayarları için
     if exist('config.mat', 'file')
-        load('config.mat');
+        % Değişken adı çakışmasını önlemek için farklı bir isimle yükle
+        config_data = load('config.mat');
+        config_settings = config_data.configuration;
         
         % API seçeneği etkinleştirildi mi kontrol et
-        if isfield(config, 'use_overpass') && config.use_overpass || ...
-           isfield(config, 'use_osm') && config.use_osm || ...
-           isfield(config, 'use_tomtom') && config.use_tomtom
+        if isfield(config_settings, 'use_overpass') && config_settings.use_overpass || ...
+           isfield(config_settings, 'use_osm') && config_settings.use_osm || ...
+           isfield(config_settings, 'use_tomtom') && config_settings.use_tomtom
             
             % API güncelleştirme aralığını kontrol et
             persistent last_api_update;
             persistent api_traffic_data;
             
             if isempty(last_api_update) || ...
-               (current_time - last_api_update >= config.api_update_interval)
+               (current_time - last_api_update >= config_settings.api_update_interval)
                 % API'den trafik verilerini al
-                api_traffic_data = get_traffic_data();
+                api_traffic_data = traffic_data();
                 last_api_update = current_time;
                 fprintf('API verileri güncellendi: Zaman = %d saniye\n', current_time);
             end
@@ -52,7 +54,7 @@ try
         end
     end
 catch e
-    warning('API verisi kullanılırken hata oluştu: %s\nVarsayılan varış oranları kullanılıyor.', e.message);
+    warning('TRAFFICSIM:APIDataError', 'API verisi kullanılırken hata oluştu: %s\\nVarsayılan varış oranları kullanılıyor.', e.message);
 end
 
 % Custom Poisson distribution implementation

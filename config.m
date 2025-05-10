@@ -21,11 +21,10 @@ configuration.use_overpass = true; % Use Overpass API (free, no API key required
 configuration.overpass_radius = 500; % Search radius in meters around intersection
 
 % Save configuration
-config = configuration;
-save('config.mat', 'config');
+save('config.mat', 'configuration');
 
 % Display the selected intersection
 fprintf('Selected intersection coordinates:\n');
-fprintf('Latitude: %.4f\n', config.intersection_location.lat);
-fprintf('Longitude: %.4f\n', config.intersection_location.long);
+fprintf('Latitude: %.4f\n', configuration.intersection_location.lat);
+fprintf('Longitude: %.4f\n', configuration.intersection_location.long);
 fprintf('\nTo change the intersection location, edit the coordinates in this file.\n');

@@ -82,25 +82,24 @@ end
 % Google Maps API anahtarı (kullanılmasa bile kaydedelim)
 configuration.google_maps_api_key = 'YOUR_GOOGLE_MAPS_API_KEY';
 
-% Değişiklikleri config değişkenine aktar ve kaydet
-config = configuration;
-save('config.mat', 'config');
+% Değişiklikleri kaydet
+save('config.mat', 'configuration');
 
 % Yapılandırma özeti
 fprintf('\n=== Yapılandırma Özeti ===\n');
-fprintf('Kavşak Konumu: %.4f, %.4f\n', config.intersection_location.lat, config.intersection_location.long);
+fprintf('Kavşak Konumu: %.4f, %.4f\n', configuration.intersection_location.lat, configuration.intersection_location.long);
 
-if config.use_overpass
-    fprintf('API: Overpass API (Yarıçap: %d metre)\n', config.overpass_radius);
-elseif config.use_osm
+if configuration.use_overpass
+    fprintf('API: Overpass API (Yarıçap: %d metre)\n', configuration.overpass_radius);
+elseif configuration.use_osm
     fprintf('API: OpenStreetMap API\n');
-elseif config.use_tomtom
+elseif configuration.use_tomtom
     fprintf('API: TomTom API\n');
 else
     fprintf('API: Kullanılmıyor\n');
 end
 
-fprintf('API Güncelleme Aralığı: %d saniye\n', config.api_update_interval);
+fprintf('API Güncelleme Aralığı: %d saniye\n', configuration.api_update_interval);
 fprintf('\nYapılandırma "config.mat" dosyasına kaydedildi.\n');
 fprintf('Simülasyonu başlatmak için "main_simulation" komutunu çalıştırın.\n');
 fprintf('===========================================\n');
