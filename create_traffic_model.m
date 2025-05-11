@@ -1,321 +1,352 @@
-% create_traffic_model.m - Trafik Işığı Simulink Modelini Otomatik Oluşturur
-
 function create_traffic_model()
-    % Mevcut modeli kapat ve temizle
-    if bdIsLoaded('traffic_model')
-        close_system('traffic_model', 0);
+    % Trafik ışığı Simulink modeli otomatik oluşturma scripti
+    modelName = 'traffic_light_model';
+    
+    % MATLAB sürüm uyumluluğu için gerekli ayarlamalar
+    fprintf('MATLAB sürüm uyumluluğu kontrolü yapılıyor...\n');
+    
+    % Var olan modeli kapat
+    if bdIsLoaded(modelName)
+        close_system(modelName, 0);
     end
+    % Yeni model oluştur ve aç
+    new_system(modelName);
 
-    % Yeni model oluştur
-    new_system('traffic_model');
-    open_system('traffic_model');
-
-    % Model parametrelerini ayarla
-    set_param('traffic_model', 'StopTime', '120');
-    set_param('traffic_model', 'FixedStep', '1');
-    set_param('traffic_model', 'EnablePacing', 'on');
-    set_param('traffic_model', 'PacingRate', '1');
-
+    open_system(modelName);
+    % Model ayarları
+    set_param(modelName, 'StopTime', '300');
+    set_param(modelName, 'SolverType', 'Fixed-step');
+    set_param(modelName, 'Solver', 'ode4');
+    set_param(modelName, 'FixedStep', '0.1');  % 0.1 adım boyutu, Random Number bloklarıyla uyumlu
+    set_param(modelName, 'EnablePacing', 'on');
+    set_param(modelName, 'PacingRate', '1');
     % Alt sistemleri oluştur
-    subsystems = {'Vehicle_Generator', 'Queue_System', 'Traffic_Light_Controller', 'PID_Controller', 'Visualization'};
-    for i = 1:length(subsystems)
-        add_block('built-in/Subsystem', ['traffic_model/' subsystems{i}]);
-    end
-
-    % Alt sistemlerin içeriğini oluştur
-    create_vehicle_generator();
-    create_queue_system();
-    create_traffic_light_controller();
-    create_pid_controller();
-    create_visualization();
-
-    % Alt sistemleri bağla
-    connect_subsystems();
-
-    % Modeli düzenle ve kaydet
-    set_param('traffic_model', 'ZoomFactor', 'FitSystem');
-    Simulink.BlockDiagram.arrangeSystem('traffic_model');
-    save_system('traffic_model');
-
-    fprintf('Simulink modeli başarıyla oluşturuldu!\n');
-    fprintf('Modeli açmak için: open_system(''traffic_model'')\n');
-    fprintf('Simülasyonu başlatmak için: sim(''traffic_model'')\n');
+    create_api_data_interface(modelName);
+    create_vehicle_generator(modelName);
+    create_queue_system(modelName);
+    create_traffic_light_controller(modelName);
+    create_pid_controller(modelName);
+    create_visualization(modelName);
+    % Bağlantılar
+    connect_subsystems(modelName);
+    % Düzenle, kaydet ve bildir
+    set_param(modelName, 'ZoomFactor', 'FitSystem');
+    Simulink.BlockDiagram.arrangeSystem(modelName);
+    save_system(modelName);
+    fprintf('Model "%s" başarıyla oluşturuldu.\n', modelName);
 end
 
-function create_vehicle_generator()
-    % Vehicle Generator alt sistemini oluştur
-    path = 'traffic_model/Vehicle_Generator';
+function create_api_data_interface(modelName)
+    % API verisi alt sistemi
+    subsystemPath = [modelName '/API_Data_Interface'];
+    add_block('built-in/Subsystem', subsystemPath);
+
+    % API çıktı portları ekleme
+    add_block('built-in/Outport', [subsystemPath '/north_density'], 'Port', '1', 'Position', [400, 50, 420, 70]);
+    add_block('built-in/Outport', [subsystemPath '/south_density'], 'Port', '2', 'Position', [400, 100, 420, 120]);
+    add_block('built-in/Outport', [subsystemPath '/east_density'], 'Port', '3', 'Position', [400, 150, 420, 170]);
+    add_block('built-in/Outport', [subsystemPath '/west_density'], 'Port', '4', 'Position', [400, 200, 420, 220]);
+
+    % Arka plan için sönük sabit değerler (API verisi gelmediğinde kullanılmak üzere)
+    add_block('simulink/Sources/Constant', [subsystemPath '/North_Const'], 'Value', '0.5', 'Position', [50, 50, 100, 70]);
+    add_block('simulink/Sources/Constant', [subsystemPath '/South_Const'], 'Value', '0.6', 'Position', [50, 100, 100, 120]);
+    add_block('simulink/Sources/Constant', [subsystemPath '/East_Const'], 'Value', '0.4', 'Position', [50, 150, 100, 170]);
+    add_block('simulink/Sources/Constant', [subsystemPath '/West_Const'], 'Value', '0.3', 'Position', [50, 200, 100, 220]);
     
-    % Blokları ekle
-    add_block('simulink/Sources/Random Number', [path '/Random_Number']);
-    add_block('built-in/RateLimiter', [path '/Rate_Limiter']);
-    add_block('simulink/Math Operations/Gain', [path '/Poisson_Gain']);
-    add_block('built-in/Outport', [path '/Out1']);
+    % Rastgele değişimler - API verisi güncellemelerini simüle etmek için
+    add_block('simulink/Sources/Uniform Random Number', [subsystemPath '/Random_Var'], 'Position', [50, 250, 100, 270], 'Minimum', '-0.1', 'Maximum', '0.1', 'SampleTime', '0.1');
     
-    % Parametreleri ayarla
+    % Karıştırma bloğu (mixer)
+    add_block('simulink/Math Operations/Add', [subsystemPath '/Mix_North'], 'Inputs', '++', 'Position', [200, 50, 230, 80]);
+    add_block('simulink/Math Operations/Add', [subsystemPath '/Mix_South'], 'Inputs', '++', 'Position', [200, 100, 230, 130]);
+    add_block('simulink/Math Operations/Add', [subsystemPath '/Mix_East'], 'Inputs', '++', 'Position', [200, 150, 230, 180]);
+    add_block('simulink/Math Operations/Add', [subsystemPath '/Mix_West'], 'Inputs', '++', 'Position', [200, 200, 230, 230]);
+    
+    % Bağlantılar
+    add_line(subsystemPath, 'North_Const/1', 'Mix_North/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'South_Const/1', 'Mix_South/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'East_Const/1', 'Mix_East/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'West_Const/1', 'Mix_West/1', 'autorouting', 'on');
+    
+    add_line(subsystemPath, 'Random_Var/1', 'Mix_North/2', 'autorouting', 'on');
+    add_line(subsystemPath, 'Random_Var/1', 'Mix_South/2', 'autorouting', 'on');
+    add_line(subsystemPath, 'Random_Var/1', 'Mix_East/2', 'autorouting', 'on');
+    add_line(subsystemPath, 'Random_Var/1', 'Mix_West/2', 'autorouting', 'on');
+    
+    add_line(subsystemPath, 'Mix_North/1', 'north_density/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'Mix_South/1', 'south_density/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'Mix_East/1', 'east_density/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'Mix_West/1', 'west_density/1', 'autorouting', 'on');
+    
+    % API entegrasyonu için veri üreteci ekleme
+    % MATLAB Function bloğu yerine rastgele değişen sinyal üreticileri kullanacağız
+    
+    % Rastgele değişen sinyaller için özel bloklar ekle
+    % Kuzey trafik sinyali üreteci
+    api_north_pos = [100, 400, 150, 430];
+    add_block('simulink/Sources/Uniform Random Number', [subsystemPath '/API_North'], ...
+        'Position', api_north_pos, 'Minimum', '0.4', 'Maximum', '0.7', 'SampleTime', '0.5');
+        
+    % Güney trafik sinyali üreteci
+    api_south_pos = [100, 450, 150, 480];
+    add_block('simulink/Sources/Uniform Random Number', [subsystemPath '/API_South'], ...
+        'Position', api_south_pos, 'Minimum', '0.3', 'Maximum', '0.6', 'SampleTime', '0.7');
+        
+    % Doğu trafik sinyali üreteci
+    api_east_pos = [100, 500, 150, 530];
+    add_block('simulink/Sources/Uniform Random Number', [subsystemPath '/API_East'], ...
+        'Position', api_east_pos, 'Minimum', '0.2', 'Maximum', '0.5', 'SampleTime', '0.6');
+        
+    % Batı trafik sinyali üreteci
+    api_west_pos = [100, 550, 150, 580];
+    add_block('simulink/Sources/Uniform Random Number', [subsystemPath '/API_West'], ...
+        'Position', api_west_pos, 'Minimum', '0.3', 'Maximum', '0.7', 'SampleTime', '0.8');
+    
+    % Bias ekleyerek değişimleri daha gerçekçi yap
+    bias_pos = [200, 400, 250, 450];
+    add_block('simulink/Math Operations/Bias', [subsystemPath '/Bias_North'], ...
+        'Position', [200, 400, 250, 430], 'Bias', '0.2');
+    add_block('simulink/Math Operations/Bias', [subsystemPath '/Bias_South'], ...
+        'Position', [200, 450, 250, 480], 'Bias', '-0.1');
+    add_block('simulink/Math Operations/Bias', [subsystemPath '/Bias_East'], ...
+        'Position', [200, 500, 250, 530], 'Bias', '0.1');
+    add_block('simulink/Math Operations/Bias', [subsystemPath '/Bias_West'], ...
+        'Position', [200, 550, 250, 580], 'Bias', '-0.05');
+    
+    % Önce eski bağlantıları kaldır
+    try
+        delete_line(subsystemPath, 'North_Const/1', 'Mix_North/1');
+        delete_line(subsystemPath, 'South_Const/1', 'Mix_South/1');
+        delete_line(subsystemPath, 'East_Const/1', 'Mix_East/1');
+        delete_line(subsystemPath, 'West_Const/1', 'Mix_West/1');
+    catch
+        % Bağlantı yoksa sessizce devam et
+    end
+    
+    % API fonksiyonunun çıktılarını bağla
+    add_line(subsystemPath, 'API_North/1', 'Bias_North/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'API_South/1', 'Bias_South/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'API_East/1', 'Bias_East/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'API_West/1', 'Bias_West/1', 'autorouting', 'on');
+    
+    % Mixer'a bağla
+    add_line(subsystemPath, 'Bias_North/1', 'Mix_North/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'Bias_South/1', 'Mix_South/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'Bias_East/1', 'Mix_East/1', 'autorouting', 'on');
+    add_line(subsystemPath, 'Bias_West/1', 'Mix_West/1', 'autorouting', 'on');
+    
+    fprintf('API simülasyonu başarıyla etkinleştirildi (rastgele değerlerle).\n');
+end
+
+function create_vehicle_generator(modelName)
+    % Araç üretim alt sistemi
+    path = [modelName '/Vehicle_Generator']; 
+    add_block('built-in/Subsystem', path);
+    
+    add_block('simulink/Sources/Uniform Random Number', [path '/Random_Number'], 'Position', [50, 50, 100, 80], 'Minimum', '0', 'Maximum', '1', 'SampleTime', '0.1');
+    add_block('built-in/RateLimiter', [path '/Rate_Limiter'], 'Position', [150, 50, 200, 80]);
+    add_block('simulink/Math Operations/Gain', [path '/Poisson_Gain'], 'Position', [250, 50, 300, 80]);
+    add_block('built-in/Outport', [path '/Out1'], 'Port', '1', 'Position', [350, 50, 370, 80]);
+    
     set_param([path '/Poisson_Gain'], 'Gain', '1/60');
-    set_param([path '/Out1'], 'Port', '1');
     
-    % Bağlantıları yap
     add_line(path, 'Random_Number/1', 'Rate_Limiter/1', 'autorouting', 'on');
     add_line(path, 'Rate_Limiter/1', 'Poisson_Gain/1', 'autorouting', 'on');
     add_line(path, 'Poisson_Gain/1', 'Out1/1', 'autorouting', 'on');
 end
 
-function create_queue_system()
-    % Queue System alt sistemini oluştur
-    path = 'traffic_model/Queue_System';
-
-    % Parametreler (önerilen değerler)
-    maxDeparturesPerSecond = 0.5; % Yeşil ışıkta saniyede ayrılabilecek maksimum araç
-    Ts_val = 1; % Modelin FixedStep değeriyle aynı olmalı
-    departureGainValue = sprintf('%g*%g', maxDeparturesPerSecond, Ts_val); % Gain değeri için string
-    queueCapacityValue = '100'; % Maksimum kuyruk kapasitesi
-    epsValue = 'eps'; % Sıfıra bölme için eşik değeri
-
-    % (1) Open and clear out any default ports
-    open_system(path);
-    % Mevcut blokları ve hatları temizle (özellikle yeniden çalıştırırken önemli)
-    all_lines = find_system(path, 'FindAll', 'on', 'type', 'line');
-    for k = 1:length(all_lines)
-        try % Bazen hatlar zaten silinmiş olabilir
-            delete_line(get(all_lines(k),'SrcBlockHandle'), get(all_lines(k),'DstBlockHandle'));
-        catch
-        end
-    end
-    all_blocks = find_system(path, 'SearchDepth', 1, 'Type', 'Block');
-    % Ana subsystem'i silmemek için kontrol
-    for k = 1:length(all_blocks)
-        if ~strcmp(get_param(all_blocks{k}, 'Name'), 'Queue_System')
-             try
-                delete_block(all_blocks{k});
-             catch
-             end
-        end
-    end
-    % Portları da temizleyelim (find_system ile gelen Inport/Outport'ları sildikten sonra da kalabilir)
-    % delete_block(find_system(path, 'BlockType', 'Inport'));
-    % delete_block(find_system(path, 'BlockType', 'Outport'));
-
-
-    % (2) Explicitly add Inports
-    add_block('built-in/Inport', [path '/In1']); % Arrivals (lambda for wait time)
-    set_param([path '/In1'], 'Port', '1');
-    add_block('built-in/Inport', [path '/In2']); % Light Signal (0 or 1 from TLC)
-    set_param([path '/In2'], 'Port', '2');
-
-    % (3) Add Outports: Out1 for Queue Length (L), Out2 for Wait Time (W)
-    add_block('built-in/Outport', [path '/Out1']); % Queue Length (L_new)
-    set_param([path '/Out1'], 'Port', '1');
-    add_block('built-in/Outport', [path '/Out2']); % Wait Time (W)
-    set_param([path '/Out2'], 'Port', '2');
-
-    % (4) Departure Control Blocks
-    add_block('simulink/Math Operations/Gain', [path '/Departure_Gain']);
-    set_param([path '/Departure_Gain'], 'Gain', departureGainValue);
-
-    % (5) Main blocks for queue logic
-    add_block('simulink/Discrete/Unit Delay', [path '/Queue_Delay']); % Stores L_old
-    set_param([path '/Queue_Delay'], 'InitialCondition', '0'); % Başlangıçta kuyruk boş
-    add_block('simulink/Math Operations/Sum', [path '/Queue_Sum_Arrivals']); % L_old + Arrivals
-    set_param([path '/Queue_Sum_Arrivals'], 'Inputs', '++');
-    add_block('simulink/Math Operations/Sum', [path '/Queue_Subtract_Departures']); % (L_old + Arrivals) - Actual_Departures = L_new_raw
-    set_param([path '/Queue_Subtract_Departures'], 'Inputs', '+-');
-    add_block('simulink/Discontinuities/Saturation', [path '/Queue_Saturate']); % L_new_saturated
-    set_param([path '/Queue_Saturate'], 'UpperLimit', queueCapacityValue, 'LowerLimit', '0');
-
-    % (6) Blocks for Wait Time calculation (W = L_old / lambda, protected)
-    add_block('simulink/Math Operations/Divide', [path '/Protected_WaitTime_Divide']);
-    set_param([path '/Protected_WaitTime_Divide'], 'SampleTime', '-1'); % Inherit sample time
-    add_block('simulink/Sources/Constant', [path '/ZeroConst_For_WaitTime']);
-    set_param([path '/ZeroConst_For_WaitTime'], 'Value', '0');
-    add_block('simulink/Signal Routing/Switch', [path '/Wait_Switch']);
-    set_param([path '/Wait_Switch'], 'Criteria', 'u2 > Threshold', 'Threshold', epsValue);
-
-    % (7) Wire up the connections
-    % Departure Control Path
-    add_line(path, 'In2/1', 'Departure_Gain/1', 'autorouting', 'on'); % Light Signal to Departure_Gain
-
-    % Queue Logic Path: L_new = saturate(L_old + Arrivals - Actual_Departures)
-    add_line(path, 'Queue_Delay/1', 'Queue_Sum_Arrivals/1', 'autorouting', 'on');      % L_old to Sum1
-    add_line(path, 'In1/1', 'Queue_Sum_Arrivals/2', 'autorouting', 'on');              % Arrivals to Sum1
-    add_line(path, 'Queue_Sum_Arrivals/1', 'Queue_Subtract_Departures/1', 'autorouting', 'on'); % (L_old + Arrivals) to Sum2
-    add_line(path, 'Departure_Gain/1', 'Queue_Subtract_Departures/2', 'autorouting', 'on'); % Actual_Departures to Sum2
-    add_line(path, 'Queue_Subtract_Departures/1', 'Queue_Saturate/1', 'autorouting', 'on'); % L_new_raw to Saturation
-    add_line(path, 'Queue_Saturate/1', 'Queue_Delay/1', 'autorouting', 'on');  % L_new_saturated back to Delay (becomes L_old for next step)
-    add_line(path, 'Queue_Saturate/1', 'Out1/1', 'autorouting', 'on');        % L_new_saturated to Out1 (Queue Length)
-
-    % Wait Time Calculation Path: W = (lambda > eps) ? (L_old / lambda) : 0
-    add_line(path, 'Queue_Delay/1', 'Protected_WaitTime_Divide/1', 'autorouting', 'on'); % L_old to Divide Numerator
-    add_line(path, 'In1/1', 'Protected_WaitTime_Divide/2', 'autorouting', 'on');         % lambda to Divide Denominator
+function create_queue_system(modelName)
+    % Kuyruk sistemi alt modülü
+    path = [modelName '/Queue_System']; 
+    add_block('built-in/Subsystem', path);
     
-    add_line(path, 'Protected_WaitTime_Divide/1', 'Wait_Switch/1', 'autorouting', 'on'); % (L_old/lambda) to Switch (if true)
-    add_line(path, 'In1/1', 'Wait_Switch/2', 'autorouting', 'on');                       % lambda to Switch (control)
-    add_line(path, 'ZeroConst_For_WaitTime/1', 'Wait_Switch/3', 'autorouting', 'on');    % 0 to Switch (if false)
-    add_line(path, 'Wait_Switch/1', 'Out2/1', 'autorouting', 'on');                      % W to Out2 (Wait Time)
+    % Parametreler
+    maxDep = 0.5; 
+    Ts = 1; 
+    depGain = sprintf('%g*%g', maxDep, Ts);
+    capacity = '100'; 
+    epsV = '2.2204e-16';
+    
+    % Giriş/Çıkış
+    add_block('built-in/Inport', [path '/InArr'], 'Port', '1', 'Position', [50, 50, 70, 70]);
+    add_block('built-in/Inport', [path '/InLight'], 'Port', '2', 'Position', [50, 150, 70, 170]);
+    add_block('built-in/Outport', [path '/QueueLen'], 'Port', '1', 'Position', [500, 50, 520, 70]);
+    add_block('built-in/Outport', [path '/WaitTime'], 'Port', '2', 'Position', [500, 150, 520, 170]);
+    
+    % Bloklar
+    add_block('simulink/Math Operations/Gain', [path '/DepGain'], 'Gain', depGain, 'Position', [150, 150, 180, 170]);
+    add_block('simulink/Discrete/Unit Delay', [path '/Delay'], 'InitialCondition', '0', 'Position', [350, 200, 380, 230]);
+    add_block('simulink/Math Operations/Sum', [path '/Sum'], 'Inputs', '++', 'Position', [200, 50, 230, 80]);
+    add_block('simulink/Math Operations/Sum', [path '/Sub'], 'Inputs', '+-', 'Position', [300, 50, 330, 80]);
+    add_block('simulink/Discontinuities/Saturation', [path '/Sat'], 'UpperLimit', capacity, 'LowerLimit', '0', 'Position', [400, 50, 430, 80]);
+    add_block('simulink/Math Operations/Divide', [path '/Div'], 'SampleTime', '-1', 'Position', [200, 250, 230, 280]);
+    add_block('simulink/Sources/Constant', [path '/Zero'], 'Value', '0', 'Position', [200, 300, 230, 330]);
+    
+    % Compare ve Switch yerine daha basit ve sürümden bağımsız bir yaklaşım kullanıyoruz
+    % Relational Operator kullanarak sıfırdan farklılık kontrolü
+    add_block('simulink/Logic and Bit Operations/Relational Operator', [path '/NonZeroCheck'], 'Operator', '~=', 'Position', [250, 350, 280, 380]);
+    add_block('simulink/Sources/Constant', [path '/ZeroConst'], 'Value', '0', 'Position', [150, 350, 180, 380]);
+    
+    % Her sürümde çalışacak şekilde en temel Switch bloğu
+    add_block('simulink/Signal Routing/Switch', [path '/Switch'], 'Position', [350, 150, 380, 180]);
+    
+    % Bağlantılar
+    add_line(path, 'InLight/1', 'DepGain/1', 'autorouting', 'on');
+    add_line(path, 'Delay/1', 'Sum/1', 'autorouting', 'on');
+    add_line(path, 'InArr/1', 'Sum/2', 'autorouting', 'on');
+    add_line(path, 'Sum/1', 'Sub/1', 'autorouting', 'on');
+    add_line(path, 'DepGain/1', 'Sub/2', 'autorouting', 'on');
+    add_line(path, 'Sub/1', 'Sat/1', 'autorouting', 'on');
+    add_line(path, 'Sat/1', 'Delay/1', 'autorouting', 'on');
+    add_line(path, 'Sat/1', 'QueueLen/1', 'autorouting', 'on');
+    add_line(path, 'Delay/1', 'Div/1', 'autorouting', 'on');
+    add_line(path, 'InArr/1', 'Div/2', 'autorouting', 'on');
+    add_line(path, 'Div/1', 'Switch/1', 'autorouting', 'on');
+    
+    % NonZero kontrol bağlantıları
+    add_line(path, 'InArr/1', 'NonZeroCheck/1', 'autorouting', 'on');
+    add_line(path, 'ZeroConst/1', 'NonZeroCheck/2', 'autorouting', 'on');
+    add_line(path, 'NonZeroCheck/1', 'Switch/2', 'autorouting', 'on');
+    add_line(path, 'Zero/1', 'Switch/3', 'autorouting', 'on');
+    add_line(path, 'Switch/1', 'WaitTime/1', 'autorouting', 'on');
 end
 
-function create_traffic_light_controller()
-    % Traffic Light Controller alt sistemini oluştur
-    path = 'traffic_model/Traffic_Light_Controller';
-    state_machine_path = [path '/State_Machine'];
+function create_traffic_light_controller(modelName)
+    % Trafik ışığı kontrolcüsü alt modu
+    path = [modelName '/Traffic_Light_Controller'];
+    add_block('built-in/Subsystem', path);
     
-    % Blokları ekle
-    add_block('simulink/Ports & Subsystems/Subsystem', state_machine_path);
+    % Durum Makinesi alt sistemi
+    sm = [path '/State_Machine'];
+    add_block('built-in/Subsystem', sm);
     
-    % Varsayılan portları sil
-    delete_line(state_machine_path, 'In1/1', 'Out1/1');
-    delete_block([state_machine_path '/In1']);
-    delete_block([state_machine_path '/Out1']);
+    % Ana sistem port tanımları
+    add_block('built-in/Inport', [path '/In1'], 'Port', '1', 'Position', [50, 50, 70, 70]);
+    add_block('built-in/Outport', [path '/Out1'], 'Port', '1', 'Position', [350, 50, 370, 70]);
     
-    % Yeni portları ekle
-    add_block('built-in/Inport', [state_machine_path '/In1']);
-    add_block('built-in/Outport', [state_machine_path '/Out1']);
-    add_block('built-in/Inport', [path '/In1']);
-    add_block('built-in/Outport', [path '/Out1']);
+    % Durum Makinesi içindeki portlar
+    add_block('built-in/Inport', [sm '/In1'], 'Port', '1', 'Position', [50, 50, 70, 70]);
+    add_block('built-in/Outport', [sm '/Out1'], 'Port', '1', 'Position', [250, 50, 270, 70]);
     
-    % Parametreleri ayarla
-    set_param([state_machine_path '/In1'], 'Port', '1');
-    set_param([state_machine_path '/Out1'], 'Port', '1');
-    set_param([path '/In1'], 'Port', '1');
-    set_param([path '/Out1'], 'Port', '1');
+    % Durum Makinesi içinde basit bir geçirgen mantık (Through Logic)
+    add_block('simulink/Signal Routing/Manual Switch', [sm '/Manual_Control'], 'Position', [150, 50, 180, 80]);
+    set_param([sm '/Manual_Control'], 'sw', '0');
     
-    % Bağlantıları yap
-    add_line(state_machine_path, 'In1/1', 'Out1/1', 'autorouting', 'on');
+    % Durum Makinesi bağlantıları
+    add_line(sm, 'In1/1', 'Manual_Control/1', 'autorouting', 'on');
+    add_line(sm, 'Manual_Control/1', 'Out1/1', 'autorouting', 'on');
+    
+    % Ana sistem bağlantıları
     add_line(path, 'In1/1', 'State_Machine/1', 'autorouting', 'on');
     add_line(path, 'State_Machine/1', 'Out1/1', 'autorouting', 'on');
 end
 
-function create_pid_controller()
-    % PID Controller alt sistemini oluştur
-    path = 'traffic_model/PID_Controller';
+function create_pid_controller(modelName)
+    % PID kontrol alt birimi
+    path = [modelName '/PID_Controller'];
+    add_block('built-in/Subsystem', path);
     
-    % Blokları ekle
-    add_block('built-in/Inport', [path '/In1']); % Input: Queue Length (Ölçülen Değer)
-    add_block('simulink/Sources/Constant', [path '/Setpoint_Constant']); % Ayar Noktası
-    add_block('simulink/Discrete/Unit Delay', [path '/Feedback_Delay']); % Cebirsel döngüyü kırmak için
-    add_block('simulink/Math Operations/Sum', [path '/Error_Sum']); % Hata = Ayar Noktası - Ölçülen Değer
-    add_block('simulink/Math Operations/Gain', [path '/Proportional_Gain']);
-    add_block('simulink/Discrete/Discrete-Time Integrator', [path '/Discrete_Time_Integrator']); % Ayrık Zamanlı İntegral
-    add_block('simulink/Discrete/Discrete Derivative', [path '/Discrete_Derivative']); % Sürekli yerine Ayrık Türev
-    add_block('simulink/Math Operations/Sum', [path '/PID_Sum']);
-    add_block('built-in/Outport', [path '/Out1']); % Output: Kontrol Sinyali
+    % Giriş portları
+    dirs = {'north', 'south', 'east', 'west'};
+    for i = 1:4
+        add_block('built-in/Inport', [path '/' dirs{i} '_in'], 'Port', num2str(i), 'Position', [50, 50*i, 70, 50*i+20]);
+    end
     
-    % Parametreleri ayarla
-    set_param([path '/In1'], 'Port', '1');
-    set_param([path '/Setpoint_Constant'], 'Value', '10'); % Hedef kuyruk uzunluğu (ayarlanabilir)
-    set_param([path '/Error_Sum'], 'Inputs', '+-'); % Hata = Giriş1 - Giriş2
-    set_param([path '/Proportional_Gain'], 'Gain', '0.5');
-    set_param([path '/Discrete_Time_Integrator'], 'IntegratorMethod', 'Forward Euler');
-    set_param([path '/Discrete_Time_Integrator'], 'SampleTime', '-1'); % Kalıtımsal örnekleme zamanı
-    % Discrete_Derivative için özel bir ayar gerekirse buraya eklenebilir.
-    set_param([path '/PID_Sum'], 'Inputs', '+++');
-    set_param([path '/Out1'], 'Port', '1');
+    % Ortalama fark hesaplama
+    add_block('simulink/Math Operations/Add', [path '/Sum_NS'], 'Inputs', '++', 'Position', [150, 75, 180, 105]);
+    add_block('simulink/Math Operations/Gain', [path '/Gain_NS'], 'Gain', '0.5', 'Position', [200, 75, 230, 105]);
+    add_block('simulink/Math Operations/Add', [path '/Sum_EW'], 'Inputs', '++', 'Position', [150, 175, 180, 205]);
+    add_block('simulink/Math Operations/Gain', [path '/Gain_EW'], 'Gain', '0.5', 'Position', [200, 175, 230, 205]);
+    add_block('simulink/Math Operations/Sum', [path '/Error'], 'Inputs', '+-', 'Position', [280, 125, 310, 155]);
     
-    % Bağlantıları yap
-    add_line(path, 'In1/1', 'Feedback_Delay/1', 'autorouting', 'on'); % Ölçülen Değer -> Gecikme Bloğu
-    add_line(path, 'Setpoint_Constant/1', 'Error_Sum/1', 'autorouting', 'on'); % Ayar Noktası -> Hata_Sum Giriş1
-    add_line(path, 'Feedback_Delay/1', 'Error_Sum/2', 'autorouting', 'on');    % Gecikmiş Ölçülen Değer -> Hata_Sum Giriş2
-
-    add_line(path, 'Error_Sum/1', 'Proportional_Gain/1', 'autorouting', 'on');
-    add_line(path, 'Error_Sum/1', 'Discrete_Time_Integrator/1', 'autorouting', 'on'); % Hata -> Ayrık Zamanlı İntegral
-    add_line(path, 'Error_Sum/1', 'Discrete_Derivative/1', 'autorouting', 'on'); % Hata -> Ayrık Türev
+    % P-I-D blokları
+    add_block('simulink/Math Operations/Gain', [path '/P'], 'Gain', '1', 'Position', [350, 75, 380, 105]);
+    add_block('simulink/Discrete/Discrete-Time Integrator', [path '/I'], 'IntegratorMethod', 'Forward Euler', 'SampleTime', '-1', 'Position', [350, 125, 380, 155]);
+    add_block('simulink/Discrete/Discrete Derivative', [path '/D'], 'Position', [350, 175, 380, 205]);
+    add_block('simulink/Math Operations/Sum', [path '/PID_Sum'], 'Inputs', '+++', 'Position', [430, 125, 460, 155]);
+    add_block('built-in/Outport', [path '/Out1'], 'Port', '1', 'Position', [520, 125, 540, 155]);
     
-    add_line(path, 'Proportional_Gain/1', 'PID_Sum/1', 'autorouting', 'on');
-    add_line(path, 'Discrete_Time_Integrator/1', 'PID_Sum/2', 'autorouting', 'on'); % Ayrık İntegral Çıkışı -> PID_Sum
-    add_line(path, 'Discrete_Derivative/1', 'PID_Sum/3', 'autorouting', 'on'); % Ayrık Türev Çıkışı -> PID_Sum
+    % Bağlantılar
+    add_line(path, 'north_in/1', 'Sum_NS/1', 'autorouting', 'on');
+    add_line(path, 'south_in/1', 'Sum_NS/2', 'autorouting', 'on');
+    add_line(path, 'Sum_NS/1', 'Gain_NS/1', 'autorouting', 'on');
+    add_line(path, 'east_in/1', 'Sum_EW/1', 'autorouting', 'on');
+    add_line(path, 'west_in/1', 'Sum_EW/2', 'autorouting', 'on');
+    add_line(path, 'Sum_EW/1', 'Gain_EW/1', 'autorouting', 'on');
+    add_line(path, 'Gain_NS/1', 'Error/1', 'autorouting', 'on');
+    add_line(path, 'Gain_EW/1', 'Error/2', 'autorouting', 'on');
+    add_line(path, 'Error/1', 'P/1', 'autorouting', 'on');
+    add_line(path, 'Error/1', 'I/1', 'autorouting', 'on');
+    add_line(path, 'Error/1', 'D/1', 'autorouting', 'on');
+    add_line(path, 'P/1', 'PID_Sum/1', 'autorouting', 'on');
+    add_line(path, 'I/1', 'PID_Sum/2', 'autorouting', 'on');
+    add_line(path, 'D/1', 'PID_Sum/3', 'autorouting', 'on');
     add_line(path, 'PID_Sum/1', 'Out1/1', 'autorouting', 'on');
 end
 
-function create_visualization()
-    % Visualization alt sistemini oluştur
-    path = 'traffic_model/Visualization';
-
-    % Mevcut tüm blokları ve hatları temizle
-    open_system(path); % Alt sistemi aç
-    all_lines = find_system(path, 'FindAll', 'on', 'type', 'line');
-    for k = 1:length(all_lines)
-        try delete_line(get(all_lines(k),'Handle')); catch; end
-    end
-    all_blocks = find_system(path, 'SearchDepth', 1, 'Type', 'Block');
-    for k = 1:length(all_blocks)
-        if ~strcmp(get_param(all_blocks{k}, 'Name'), 'Visualization') % Ana subsystem'i silme
-            try delete_block(all_blocks{k}); catch; end
-        end
-    end
-
-    % Inport'leri ekle ve pozisyonlarını ayarla
-    add_block('built-in/Inport', [path '/In1']); 
-    set_param([path '/In1'],'Port','1', 'Position', '[50, 58, 80, 72]'); % Queue Length
-    add_block('built-in/Inport', [path '/In2']); 
-    set_param([path '/In2'],'Port','2', 'Position', '[50, 118, 80, 132]'); % Wait Time
-    add_block('built-in/Inport', [path '/In3']); 
-    set_param([path '/In3'],'Port','3', 'Position', '[50, 178, 80, 192]'); % Light State
-
-    % Scope bloklarını ekle ve pozisyonlarını ayarla
-    add_block('simulink/Sinks/Scope', [path '/Queue_Length_Scope']);
-    set_param([path '/Queue_Length_Scope'], 'Position', '[200, 40, 260, 90]', 'NumInputPorts', '1', 'OpenAtSimulationStart', 'on');
-
-    add_block('simulink/Sinks/Scope', [path '/Wait_Time_Scope']);
-    set_param([path '/Wait_Time_Scope'], 'Position', '[200, 100, 260, 150]', 'NumInputPorts', '1', 'OpenAtSimulationStart', 'on');
-
-    add_block('simulink/Sinks/Scope', [path '/Light_State_Scope']);
-    set_param([path '/Light_State_Scope'], 'Position', '[200, 160, 260, 210]', 'NumInputPorts', '1', 'OpenAtSimulationStart', 'on');
+function create_visualization(modelName)
+    % Görselleştirme alt sistemi
+    path = [modelName '/Visualization'];
+    add_block('built-in/Subsystem', path);
     
-    % To Workspace bloklarını ekle ve pozisyonlarını ayarla (Scope'ların sağına)
-    add_block('simulink/Sinks/To Workspace', [path '/Queue_ToWS']);
-    set_param([path '/Queue_ToWS'], 'VariableName', 'queueLengthData', 'SaveFormat', 'Array', 'Position', '[350, 40, 410, 90]');
-
-    add_block('simulink/Sinks/To Workspace', [path '/Wait_ToWS']);
-    set_param([path '/Wait_ToWS'], 'VariableName', 'waitTimeData', 'SaveFormat', 'Array', 'Position', '[350, 100, 410, 150]');
-
-    add_block('simulink/Sinks/To Workspace', [path '/Light_ToWS']);
-    set_param([path '/Light_ToWS'], 'VariableName', 'lightStateData', 'SaveFormat', 'Array', 'Position', '[350, 160, 410, 210]');
+    % Giriş portları ekle
+    add_block('built-in/Inport', [path '/In1'], 'Port', '1', 'Position', [50, 50, 70, 70]);
+    add_block('built-in/Inport', [path '/In2'], 'Port', '2', 'Position', [50, 120, 70, 140]);
+    add_block('built-in/Inport', [path '/In3'], 'Port', '3', 'Position', [50, 190, 70, 210]);
     
-    % Hatları hem Scope'lara hem de To Workspace bloklarına bağla
-    add_line(path, 'In1/1', 'Queue_Length_Scope/1','autorouting','on');
-    add_line(path, 'In1/1', 'Queue_ToWS/1','autorouting','on');
-
-    add_line(path, 'In2/1', 'Wait_Time_Scope/1','autorouting','on');
-    add_line(path, 'In2/1', 'Wait_ToWS/1','autorouting','on');
-
-    add_line(path, 'In3/1', 'Light_State_Scope/1','autorouting','on');
-    add_line(path, 'In3/1', 'Light_ToWS/1','autorouting','on');
-
-    % Alt sistemin içini otomatik düzenle
-    Simulink.BlockDiagram.arrangeSystem(path);
+    % Görüntüleyici (Scope) blokları ekle
+    add_block('simulink/Sinks/Scope', [path '/Queue_Scope'], 'Position', [200, 45, 230, 75]);
+    set_param([path '/Queue_Scope'], 'NumInputPorts', '1');
+    
+    add_block('simulink/Sinks/Scope', [path '/Wait_Scope'], 'Position', [200, 115, 230, 145]);
+    set_param([path '/Wait_Scope'], 'NumInputPorts', '1');
+    
+    add_block('simulink/Sinks/Scope', [path '/Light_Scope'], 'Position', [200, 185, 230, 215]);
+    set_param([path '/Light_Scope'], 'NumInputPorts', '1');
+    
+    % Çalışma Alanına Aktar (To Workspace) blokları ekle
+    add_block('simulink/Sinks/To Workspace', [path '/Queue_Data'], 'Position', [350, 45, 400, 75]);
+    set_param([path '/Queue_Data'], 'VariableName', 'queueData');
+    
+    add_block('simulink/Sinks/To Workspace', [path '/Wait_Data'], 'Position', [350, 115, 400, 145]);
+    set_param([path '/Wait_Data'], 'VariableName', 'waitData');
+    
+    add_block('simulink/Sinks/To Workspace', [path '/Light_Data'], 'Position', [350, 185, 400, 215]);
+    set_param([path '/Light_Data'], 'VariableName', 'lightData');
+    
+    % Bağlantılar
+    add_line(path, 'In1/1', 'Queue_Scope/1', 'autorouting', 'on');
+    add_line(path, 'In1/1', 'Queue_Data/1', 'autorouting', 'on');
+    
+    add_line(path, 'In2/1', 'Wait_Scope/1', 'autorouting', 'on');
+    add_line(path, 'In2/1', 'Wait_Data/1', 'autorouting', 'on');
+    
+    add_line(path, 'In3/1', 'Light_Scope/1', 'autorouting', 'on');
+    add_line(path, 'In3/1', 'Light_Data/1', 'autorouting', 'on');
 end
 
-function connect_subsystems()
-    % Verify and display Queue_System port counts before getting handles
-    qsPorts = get_param('traffic_model/Queue_System', 'Ports');
-    disp(['Queue_System Port Configuration (In, Out, En, Tr, St, LConn, RConn, Ifaction): ', mat2str(qsPorts)]);
-
-    % Get PortHandles for all subsystems
-    vgPH = get_param('traffic_model/Vehicle_Generator', 'PortHandles');
-    qsPH = get_param('traffic_model/Queue_System', 'PortHandles');
-    disp(['Number of Inports in Queue_System according to PortHandles: ', num2str(length(qsPH.Inport))]);
-    disp(['Number of Outports in Queue_System according to PortHandles: ', num2str(length(qsPH.Outport))]);
-
-    pidPH = get_param('traffic_model/PID_Controller', 'PortHandles');
-    tlcPH = get_param('traffic_model/Traffic_Light_Controller', 'PortHandles');
-    visPH = get_param('traffic_model/Visualization', 'PortHandles');
-
-    % Alt sistemleri birbirine bağla
-    % Vehicle Generator -> Queue System (in1)
-    add_line('traffic_model', vgPH.Outport(1), qsPH.Inport(1), 'autorouting', 'on');
+function connect_subsystems(modelName)
+    % Alt sistemler arasındaki bağlantıları oluştur
     
-    % Queue System (out1) -> PID Controller
-    add_line('traffic_model', qsPH.Outport(1), pidPH.Inport(1), 'autorouting', 'on');
+    % API_Data_Interface çıkışlarını PID_Controller girişlerine bağla
+    add_line(modelName, 'API_Data_Interface/1', 'PID_Controller/1', 'autorouting', 'on');
+    add_line(modelName, 'API_Data_Interface/2', 'PID_Controller/2', 'autorouting', 'on');
+    add_line(modelName, 'API_Data_Interface/3', 'PID_Controller/3', 'autorouting', 'on');
+    add_line(modelName, 'API_Data_Interface/4', 'PID_Controller/4', 'autorouting', 'on');
     
-    % PID Controller -> Traffic Light Controller
-    add_line('traffic_model', pidPH.Outport(1), tlcPH.Inport(1), 'autorouting', 'on');
+    % PID_Controller çıkışını Trafik_Işığı_Kontrolcüsü girişine bağla
+    add_line(modelName, 'PID_Controller/1', 'Traffic_Light_Controller/1', 'autorouting', 'on');
     
-    % Traffic Light Controller -> Queue System (in2)
-    add_line('traffic_model', tlcPH.Outport(1), qsPH.Inport(2), 'autorouting', 'on');
+    % Trafik_Işığı_Kontrolcüsü çıkışını Kuyruk_Sistemi girişine bağla
+    add_line(modelName, 'Traffic_Light_Controller/1', 'Queue_System/2', 'autorouting', 'on');
     
-    % Queue System & Traffic Light Controller -> Visualization
-    add_line('traffic_model', qsPH.Outport(1), visPH.Inport(1), 'autorouting', 'on');       % Queue Length from Queue_System Out1
-    add_line('traffic_model', qsPH.Outport(2), visPH.Inport(2), 'autorouting', 'on');        % Wait Time from Queue_System Out2
-    add_line('traffic_model', tlcPH.Outport(1), visPH.Inport(3), 'autorouting', 'on');       % Light State from TLC Out1
-end 
+    % Araç_Üretici çıkışını Kuyruk_Sistemi girişine bağla
+    add_line(modelName, 'Vehicle_Generator/1', 'Queue_System/1', 'autorouting', 'on');
+    
+    % Kuyruk_Sistemi ve Trafik_Işığı_Kontrolcüsü çıkışlarını Görselleştirme'ye bağla
+    add_line(modelName, 'Queue_System/1', 'Visualization/1', 'autorouting', 'on');
+    add_line(modelName, 'Queue_System/2', 'Visualization/2', 'autorouting', 'on');
+    add_line(modelName, 'Traffic_Light_Controller/1', 'Visualization/3', 'autorouting', 'on');
+    
+    fprintf('Alt sistemler arasındaki bağlantılar kuruldu.\n');
+end

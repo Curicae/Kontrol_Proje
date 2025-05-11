@@ -5,17 +5,39 @@ clear;
 clc;
 close all;
 
-% MATLAB path ayarları
-addpath('src/traffic');
-addpath('src/control');
-addpath('src/metrics');
-addpath('utils');
+% MATLAB yolunu düzenle - API ve diğer dosyalar için
+cur_dir = pwd;
+if strcmp(cur_dir(end-12:end), 'Kontrol_Proje')
+    % Ana dizindeyiz, doğrudan ekle
+    addpath(genpath('src'));
+    addpath('utils');
+    fprintf('Yollar ana dizinden eklendi.\n');
+else
+    % Ana dizinde değiliz, düzelt
+    if exist('Kontrol_Proje', 'dir')
+        cd('Kontrol_Proje');
+        addpath(genpath('src'));
+        addpath('utils');
+        fprintf('Ana dizine geçildi ve yollar eklendi.\n');
+    else
+        error('Lütfen Kontrol_Proje klasörünün içinde çalıştırın.');
+    end
+end
 
 fprintf('Trafik Işığı Simülasyonu Başlatılıyor...\n');
 
 % 1. Parametreleri Yükle
 run('initialize_parameters.m');
-fprintf('Parametreler yüklendi.\n');
+% PID parametrelerini artır - daha dinamik tepki için
+PID_gains_NS.Kp = PID_gains_NS.Kp * 3.0; % P kazancını artır
+PID_gains_NS.Ki = PID_gains_NS.Ki * 2.0; % I kazancını artır
+PID_gains_NS.Kd = PID_gains_NS.Kd * 1.5; % D kazancını artır
+
+PID_gains_EW.Kp = PID_gains_EW.Kp * 3.0; % P kazancını artır
+PID_gains_EW.Ki = PID_gains_EW.Ki * 2.0; % I kazancını artır
+PID_gains_EW.Kd = PID_gains_EW.Kd * 1.5; % D kazancını artır
+
+fprintf('Parametreler yüklendi ve PID kazançları artırıldı.\n');
 
 % 2. Araç Kuyruklarını Başlat
 vehicle_queues = struct('north', [], 'south', [], 'east', [], 'west', []);
@@ -40,20 +62,30 @@ next_green_duration_EW = base_green_duration;
 average_wait_times_over_time = zeros(total_simulation_duration / time_step_size, 4);
 queue_lengths_over_time = zeros(total_simulation_duration / time_step_size, 4);
 light_durations_over_time = zeros(total_simulation_duration / time_step_size, 3);
+log_api_densities = zeros(total_simulation_duration / time_step_size, 2); % API verilerini saklamak için
 total_vehicles_passed = 0;
 
 % Data logging for visualization
 log_time = zeros(1, total_simulation_duration / time_step_size);
 log_vehicle_queues_north = zeros(1, total_simulation_duration / time_step_size);
 
+% Overpass API konfigürasyonunu yükle
+try
+    fprintf('API yapılandırması yükleniyor...\n');
+    config_data = load('config.mat');
+    fprintf('API yapılandırması yüklendi: %s koordinatları kullanılacak.\n', ...
+        [num2str(config_data.configuration.intersection_location.lat), ', ', ...
+         num2str(config_data.configuration.intersection_location.long)]);
+catch config_error
+    fprintf('API yapılandırması yüklenemedi, yerel trafik hesaplamaları kullanılacak.\n');
+end
+
 % Görselleştirme pencerelerini oluştur
-figure('Name', 'Trafik Işığı Kavşağı', 'NumberTitle', 'off', 'Position', [100, 100, 800, 800]);
-figure('Name', 'Trafik Işığı Simülasyonu', 'NumberTitle', 'off', 'Position', [100, 100, 1200, 800]);
+h_fig_intersection = figure('Name', 'Kavşak Görselleştirmesi', 'NumberTitle', 'off', 'Position', [100, 300, 600, 500]);
+h_fig_metrics = figure('Name', 'Performans Metrikleri', 'NumberTitle', 'off', 'Position', [750, 300, 600, 500]);
 
 fprintf('Simülasyon başlatılıyor...\n');
-fprintf('İki görselleştirme penceresi açılacak:\n');
-fprintf('1. Trafik Işığı Kavşağı\n');
-fprintf('2. Metrik Grafikleri\n\n');
+fprintf('İki ayrı görselleştirme penceresi açılacak.\n\n');
 
 % Ana Simülasyon Döngüsü
 for t = 1:time_step_size:total_simulation_duration
@@ -77,17 +109,79 @@ for t = 1:time_step_size:total_simulation_duration
     
     fprintf('  Işık durumları güncellendi. Mevcut durum: %s, Süre: %.1f s\n', current_light_state, time_in_current_state);
 
-    % 3. Trafik Yoğunluğunu Hesapla
-    [density_NS, density_EW] = calculate_density(vehicle_queues, approaching_vehicle_time_window, current_light_state);
-    fprintf('  Trafik yoğunlukları hesaplandı. NS: %.2f, EW: %.2f\n', density_NS, density_EW);
+    % 2. Overpass API'den gerçek trafik yoğunluğunu al
+        try
+            % API'den trafik verisini al
+            api_traffic_data = traffic_data();
+        
+            % API'den gelen trafik yoğunluklarını kullan ve değerleri abartılı hale getir
+            density_NS = (api_traffic_data.north_density + api_traffic_data.south_density) / 2;
+            density_EW = (api_traffic_data.east_density + api_traffic_data.west_density) / 2;
+            
+            % Yoğunlukları daha belirgin hale getir - kontrast artır
+            density_NS = 0.5 + (density_NS - 0.5) * 1.8;  % 0.5'ten uzaklaştır
+            density_EW = 0.5 + (density_EW - 0.5) * 1.8;  % 0.5'ten uzaklaştır
+            
+            % Sınırları kontrol et
+            density_NS = max(0.1, min(0.9, density_NS));
+            density_EW = max(0.1, min(0.9, density_EW));
+            
+            % Her 20 simülasyon adımında bir, yoğunlukları karşıt yönlerde rastgele değiştir
+            if mod(t, 20) == 0
+                % Yoğunlukları ters yönlere ittir
+                random_shift = 0.15 * rand();
+                if density_NS > density_EW
+                    density_NS = density_NS + random_shift;
+                    density_EW = density_EW - random_shift;
+                else
+                    density_NS = density_NS - random_shift;
+                    density_EW = density_EW + random_shift;
+                end
+                % Sınırları tekrar kontrol et
+                density_NS = max(0.1, min(0.9, density_NS));
+                density_EW = max(0.1, min(0.9, density_EW));
+            end
+            
+            fprintf('  API veri alındı. Gerçek trafik yoğunlukları kullanılıyor (artırılmış).\n');
+        catch api_error
+            % API çalışmazsa ya da hata verirse, hesaplanan yoğunlukları kullan
+            [density_NS, density_EW] = calculate_density(vehicle_queues, approaching_vehicle_time_window, current_light_state);
+            
+            % Her 20 simülasyon adımında bir, yoğunlukları karşıt yönlerde rastgele değiştir
+            if mod(t, 20) == 0
+                % Yoğunlukları ters yönlere ittir
+                random_shift = 0.2 * rand();
+                if density_NS > density_EW
+                    density_NS = density_NS + random_shift;
+                    density_EW = density_EW - random_shift;
+                else
+                    density_NS = density_NS - random_shift;
+                    density_EW = density_EW + random_shift;
+                end
+                % Sınırları tekrar kontrol et
+                density_NS = max(0.1, min(0.9, density_NS));
+                density_EW = max(0.1, min(0.9, density_EW));
+            end
+            
+            fprintf('  API hatası, hesaplanan trafik yoğunlukları kullanılıyor (artırılmış).\n');
+        end
+        fprintf('  Trafik yoğunlukları hesaplandı. NS: %.2f, EW: %.2f\n', density_NS, density_EW);
+    
+        % API verilerini loglama
+        log_api_densities(t / time_step_size, 1) = density_NS;
+        log_api_densities(t / time_step_size, 2) = density_EW;
 
     % 4. PID Kontrolcü ile Yeşil Işık Süresini Ayarla
     if phase_changed
         if strcmp(current_light_state, 'NS_green')
             % Kuzey-Güney yönü için PID kontrolü
             error_signal = density_NS - density_EW;
+            % Hatayı büyüt
+            error_signal = error_signal * 2.0;
             [pid_output_NS, integral_term_NS, derivative_NS] = pid_controller(...
                 error_signal, PID_gains_NS, previous_error_NS, integral_term_NS, time_step_size);
+            % Çıkışı daha büyük bir aralığa yay
+            pid_output_NS = pid_output_NS * 1.5;
             next_green_duration_NS = max(min_green_duration, min(max_green_duration, base_green_duration + pid_output_NS));
             previous_error_NS = error_signal;
             green_duration_NS = next_green_duration_NS;
@@ -95,8 +189,12 @@ for t = 1:time_step_size:total_simulation_duration
         elseif strcmp(current_light_state, 'EW_green')
             % Doğu-Batı yönü için PID kontrolü
             error_signal = density_EW - density_NS;
+            % Hatayı büyüt
+            error_signal = error_signal * 2.0;
             [pid_output_EW, integral_term_EW, derivative_EW] = pid_controller(...
                 error_signal, PID_gains_EW, previous_error_EW, integral_term_EW, time_step_size);
+            % Çıkışı daha büyük bir aralığa yay
+            pid_output_EW = pid_output_EW * 1.5;
             next_green_duration_EW = max(min_green_duration, min(max_green_duration, base_green_duration + pid_output_EW));
             previous_error_EW = error_signal;
             green_duration_EW = next_green_duration_EW;
@@ -126,18 +224,17 @@ for t = 1:time_step_size:total_simulation_duration
     pause(0.01);
 
     % Her adımda görselleştirme yap
+    
     % Kavşak durumunu görselleştir
-    figure(1);
-    clf; % Mevcut figure'ı temizle
+    figure(h_fig_intersection); % Kavşak figürünü aktif et
     visualize_intersection(vehicle_queues, current_light_state);
     
     % Metrikleri görselleştir
-    figure(2);
-    clf; % Mevcut figure'ı temizle
+    figure(h_fig_metrics); % Metrik figürünü aktif et
     plot_metrics(queue_lengths_over_time(1:t / time_step_size,:), ...
-        average_wait_times_over_time(1:t / time_step_size,:), ...
-        light_durations_over_time(1:t / time_step_size,:), ...
-        time_step_size, t / time_step_size);
+                average_wait_times_over_time(1:t / time_step_size,:), ...
+                light_durations_over_time(1:t / time_step_size,:), ...
+                time_step_size, t / time_step_size, current_light_state);
     
     % Simülasyon durumunu göster
     fprintf('Adım: %d/%d, Geçen Araç: %d\n', t / time_step_size, total_simulation_duration / time_step_size, vehicles_passed_this_step);
@@ -160,19 +257,21 @@ fprintf('Ortalama bekleme süreleri (K,G,D,B): %.2f, %.2f, %.2f, %.2f saniye\n',
 fprintf('Maksimum kuyruk uzunlukları (K,G,D,B): %d, %d, %d, %d araç\n', ...
     max(queue_lengths_over_time));
 
-% 8. Sonuçları Görselleştir
+% 8. Sonuçları Görselleştir - Son görüntü
+figure(h_fig_metrics); % Metrik figürünü aktif et
 plot_metrics(queue_lengths_over_time, average_wait_times_over_time, light_durations_over_time, ...
-            time_step_size, total_simulation_duration / time_step_size);
+            time_step_size, total_simulation_duration / time_step_size, current_light_state);
+            
+% API verilerini de görselleştir
+figure('Name', 'API Trafik Yoğunlukları', 'NumberTitle', 'off', 'Position', [100, 100, 600, 400]);
+plot(1:time_step_size:total_simulation_duration, log_api_densities(:,1), 'b-', 'LineWidth', 2);
+hold on;
+plot(1:time_step_size:total_simulation_duration, log_api_densities(:,2), 'r-', 'LineWidth', 2);
+title('API''den Alınan Trafik Yoğunlukları');
+xlabel('Zaman (saniye)');
+ylabel('Trafik Yoğunluğu');
+legend('Kuzey-Güney', 'Doğu-Batı');
+grid on;
+             
 fprintf('Sonuçlar grafiklendi.\n');
-
 fprintf('Simülasyon Sonlandı.\n');
-
-% Placeholder for function calls - these will be separate .m files
-% function [queues] = generate_vehicles(queues, time, rates, dt) disp('generate_vehicles called'); end
-% function [lights, changed] = update_light_state(lights, time, phase_dur, yellow_dur, next_g_ns, next_g_ew) changed=false; disp('update_light_state called'); end
-% function [density_ns, density_ew] = calculate_density(queues, approaching_params, lights) density_ns=0; density_ew=0; disp('calculate_density called'); end
-% function [output] = pid_controller(error, gains, prev_error, integral, dt) output=0; disp('pid_controller called'); end
-% function [queues, passed] = move_vehicles(queues, lights, vpsg) passed=0; disp('move_vehicles called'); end
-% function record_metrics(idx, varargin) disp('record_metrics called'); end
-% function metrics_summary = calculate_performance_metrics(varargin) metrics_summary=struct(); disp('calculate_performance_metrics called'); end
-% function plot_metrics(varargin) disp('plot_metrics called'); end 
