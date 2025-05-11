@@ -1,155 +1,185 @@
-# KONTROL PROJE: Adaptif PID Kontrollü Trafik Işığı Simülasyonu
+# PID Kontrollü Trafik Işığı Simülasyonu
 
-<!-- Opsiyonel: Projenizi temsil eden bir logo veya görseli buraya ekleyebilirsiniz -->
-<!-- Örnek: <p align="center"><img src="images/project_logo.png" width="200"></p> -->
+## Proje Hakkında
+Bu proje, gerçek zamanlı trafik verilerini kullanarak PID kontrolcü ile yönetilen bir trafik ışığı simülasyonu gerçekleştirmektedir. Proje, OpenStreetMap verilerini kullanarak gerçek dünya trafik koşullarını simüle eder ve PID kontrolcü ile trafik akışını optimize eder.
 
-[![MATLAB](https://img.shields.io/badge/MATLAB-R2021a%2B-orange?style=for-the-badge&logo=mathworks)](https://www.mathworks.com/products/matlab.html)
-[![Simulink](https://img.shields.io/badge/Simulink-Required-blue?style=for-the-badge&logo=mathworks)](https://www.mathworks.com/products/simulink.html)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT) <!-- Lisansınızı buraya göre güncelleyin veya kaldırın -->
 
-Bu proje, **[Ders Adınız/Bölüm Adınız]** final projesi kapsamında MATLAB ve Simulink kullanılarak geliştirilmiş bir adaptif trafik ışığı kontrol sistemi simülasyonudur. Sistem, trafik yoğunluğuna göre yeşil ışık sürelerini dinamik olarak ayarlayarak kavşaklardaki trafik akışını optimize etmeyi hedefler.
+## Proje Amacı
+Bu projenin temel amacı:
+1. Gerçek zamanlı trafik verilerini kullanarak trafik simülasyonu yapmak
+2. PID kontrolcü ile trafik ışığı sürelerini optimize etmek
+3. Trafik yoğunluğuna göre dinamik olarak ışık sürelerini ayarlamak
+4. Simülasyon sonuçlarını görselleştirmek ve analiz etmek
 
-## ✨ Temel Özellikler
+## Kullanılan Teknolojiler
+- MATLAB R2024b
+- Simulink
+- Overpass API (OpenStreetMap veri erişimi)
+- PID Kontrol Teorisi
 
-*   Trafik yoğunluğuna duyarlı adaptif PID kontrolü.
-*   Tek yönlü ve dört yönlü kavşak simülasyonları.
-*   MATLAB ve Simulink (Stateflow ile) kullanılarak modüler tasarım.
-*   Detaylı performans metrikleri ve görselleştirmeler.
-*   Hem Simulink modeli (`traffic_model.slx`) hem de kapsamlı MATLAB betiği (`main_simulation.m`) ile analiz imkanı.
+## Proje Yapısı
+```
+Kontrol_Proje/
+├── Modeller/
+│   ├── traffic_light_model.slx    # Ana Simulink modeli
+│   └── traffic_light_model_1.slx  # Alternatif Simulink modeli
+├── Simülasyon Araçları/
+│   ├── create_traffic_model.m     # Model oluşturma scripti
+│   ├── main_simulation.m          # Ana simülasyon scripti
+│   ├── run_simulation.m           # Basit simülasyon çalıştırıcı
+│   ├── run_simulation_with_visualization.m # Gelişmiş simülasyon+görselleştirme
+│   └── initialize_parameters.m    # Parametre başlatma scripti
+├── Görselleştirme Araçları/
+│   ├── traffic_visualization.m    # Temel görselleştirme fonksiyonu
+│   ├── advanced_traffic_viz.m     # Gelişmiş görselleştirme araçları
+│   └── test_visualization.m       # Test verisi oluşturma ve görselleştirme
+├── Yardımcı Araçlar/
+│   ├── run_traffic_simulation.m   # Ana koordinasyon scripti
+│   ├── test_traffic_model.m       # Trafik modeli test scripti
+│   ├── traffic_data.m             # Trafik verisi oluşturma
+│   ├── run_config.m               # Konfigürasyon ayarları scripti 
+│   └── config.m                   # Temel konfigürasyon dosyası
+├── Veri/
+│   ├── traffic_config.mat         # Trafik konfigürasyon verisi
+│   └── config.mat                 # Genel konfigürasyon verisi
+├── src/                           # Kaynak kodları
+├── utils/                         # Yardımcı fonksiyonlar
+├── test/                          # Test dosyaları 
+└── docs/                          # Proje dokümantasyonu
+```
 
-## 🎯 Projenin Amacı
 
-Bu projenin temel amacı, trafik akışını optimize etmek, bekleme sürelerini azaltmak ve kavşak verimliliğini artırmak için adaptif bir trafik ışığı kontrol stratejisi geliştirmek ve simülasyonunu yapmaktır. Bu çalışma, **[Üniversite Adınız, Bölüm Adınız]** bünyesindeki **[Ders Kodu ve Adı, örn: KTRL401 Kontrol Sistemleri Tasarımı]** dersinin final projesi olarak hazırlanmıştır.
+### Çalıştırma Seçenekleri
+- **Tam Simülasyon ve Görselleştirme** (önerilen):
+  ```matlab
+  run('run_traffic_simulation.m')
+  ```
+  Bu komut, ana modeli veya test modelini çalıştırmayı dener, başarısız olursa sentetik veri oluşturur ve tüm görselleştirmeleri yapar.
 
-## 🛠️ Bileşenler
+- **Sadece Görselleştirme**:
+  ```matlab
+  traffic_visualization()  % Temel görselleştirme
+  advanced_traffic_viz()   % Gelişmiş görselleştirme
+  ```
 
-Proje iki ana simülasyon yaklaşımı sunar:
+- **Test Verisi Oluşturma**:
+  ```matlab
+  run('test_visualization.m')
+  ```
 
-1.  **`create_traffic_model.m` ile oluşturulan Simulink Modeli (`traffic_model.slx`):**
-    *   Tek bir trafik yönü için araç gelişlerini, kuyruk oluşumunu ve temel bir trafik ışığı kontrolünü (Stateflow ile) simüle eder.
-    *   Kuyruk uzunluğunu hedef bir değerde tutmak için bir PID kontrolcü içerir.
-    *   Simülasyon sonuçlarını (kuyruk uzunluğu, bekleme süresi vb.) Simulink Scope blokları üzerinden görselleştirir.
+- **Manuel Simülasyon**:
+  ```matlab
+  run_simulation_with_visualization()
+  ```
 
-2.  **`main_simulation.m` MATLAB Betiği:**
-    *   Dört yönlü bir kavşak (Kuzey, Güney, Doğu, Batı) için daha ayrıntılı bir simülasyon yürütür.
-    *   Her yönden gelen araçları, oluşan kuyrukları ve trafik ışığı döngülerini yönetir.
-    *   Kuzey-Güney ve Doğu-Batı yönleri için ayrı PID kontrolcüleri kullanarak trafik yoğunluğuna göre yeşil ışık sürelerini adaptif olarak ayarlar.
-    *   Simülasyon sırasında ve sonunda çeşitli performans metriklerini (ortalama bekleme süresi, maksimum kuyruk uzunluğu, geçen toplam araç sayısı) hesaplar ve gösterir.
-    *   Simülasyonu ve metrikleri görselleştirmek için iki ayrı MATLAB figürü oluşturur.
+## Ayrıntılı Script Açıklamaları
 
-## ⚙️ Kurulum ve Çalıştırma
+### Ana Koordinasyon ve Çalıştırma Scriptleri
+1. **run_traffic_simulation.m**
+   - **İşlev**: Tüm simülasyon sürecini koordine eden merkezi script. 
+   - **Ayrıntı**: Önce ana simülasyonu, sonra test modelini çalıştırmayı dener, ikisi de başarısız olursa sentetik veri oluşturur ve görselleştirme yapar. Tüm hata durumlarını ele alır.
+   - **Bağımlılıklar**: traffic_visualization.m, advanced_traffic_viz.m, test_visualization.m, run_simulation_with_visualization.m
 
-### Gereksinimler
+2. **run_simulation.m** 
+   - **İşlev**: Trafik simülasyonunu basit şekilde çalıştıran script.
+   - **Ayrıntı**: Sadece simülasyonu çalıştırır, görselleştirme yapmaz.
+   - **Bağımlılıklar**: traffic_light_model.slx, config.m
 
-| Yazılım/Araç Kutusu | Sürüm/Not          |
-| :------------------ | :----------------- |
-| MATLAB              | R2021a veya üstü   |
-| Simulink            | Gerekli            |
-| Stateflow           | Simulink modeli için |
+3. **run_simulation_with_visualization.m**
+   - **İşlev**: Simülasyonu çalıştıran ve sonuçları görselleştiren kapsamlı fonksiyon.
+   - **Ayrıntı**: İçerisinde basit bir test modeli çalıştırma fonksiyonu (run_simple_test_model) ve görselleştirme fonksiyonu (visualize_simulation_data) barındırır. Verileri model çalıştıktan sonra otomatik görselleştirir.
+   - **Bağımlılıklar**: traffic_light_model.slx, (içerisindeki) run_simple_test_model fonksiyonu
 
-### Çalıştırma Adımları
+### Simulink Modeli Oluşturma ve Yapılandırma
+4. **create_traffic_model.m**
+   - **İşlev**: Trafik ışığı Simulink modelini programatik olarak oluşturur.
+   - **Ayrıntı**: Tüm model bileşenlerini (blokları, alt sistemleri, bağlantıları) oluşturur ve yapılandırır.
+   - **Bağımlılıklar**: initialize_parameters.m
 
-#### 1. Simulink Modeli (`traffic_model.slx`)
+5. **main_simulation.m**
+   - **İşlev**: Ana simülasyon süreci ve algoritmasını içerir.
+   - **Ayrıntı**: Simülasyon adımlarını, lojiğini ve veri toplama süreçlerini yönetir.
+   - **Bağımlılıklar**: traffic_data.m, config.m
 
-Bu model, tek bir yöndeki trafik ışığı ve kuyruk sistemini simüle eder.
+6. **initialize_parameters.m**
+   - **İşlev**: Simülasyon parametrelerini başlatır.
+   - **Ayrıntı**: Tüm PID kontrolcü parametreleri, trafik akış parametreleri, simülasyon süresi gibi değerleri ayarlar.
+   - **Bağımlılıklar**: config.m
 
-1.  **Modeli Oluşturma:**
-    MATLAB komut satırına aşağıdaki komutu yazın:
-    ```matlab
-    create_traffic_model
-    ```
-    Bu komut, proje dizininde `traffic_model.slx` adlı Simulink model dosyasını oluşturacaktır. Komut tamamlandığında konsolda "Simulink modeli başarıyla oluşturuldu!" mesajını göreceksiniz.
+### Görselleştirme Araçları
+7. **traffic_visualization.m**
+   - **İşlev**: Trafik simülasyon sonuçlarını görselleştiren bağımsız fonksiyon.
+   - **Ayrıntı**: Workspace'deki değişkenleri akıllıca bulur ve kuyruk uzunluğu/bekleme süresi grafiklerini çizer.
+   - **Bağımlılıklar**: (Bağımsız çalışır, workspace'deki değişkenleri kullanır)
 
-2.  **Modeli Açma (İsteğe Bağlı):**
-    ```matlab
-    open_system('traffic_model')
-    ```
+8. **advanced_traffic_viz.m**
+   - **İşlev**: Gelişmiş görselleştirme araçları sunan kapsamlı fonksiyon.
+   - **Ayrıntı**: Çoklu grafikler, 3B görselleştirme, ve kavşak görünümü animasyonu oluşturur.
+   - **Bağımlılıklar**: (Bağımsız çalışır, workspace'deki değişkenleri kullanır)
 
-3.  **Simülasyonu Başlatma:**
-    ```matlab
-    sim('traffic_model')
-    ```
-    Bu komut simülasyonu başlatacaktır.
+9. **test_visualization.m**
+   - **İşlev**: Sentetik test verisi oluşturur ve görselleştirir.
+   - **Ayrıntı**: Trafik kuyrukları, yoğunluklar, ve bekleme süreleri için sentetik veriler üretir.
+   - **Bağımlılıklar**: traffic_visualization.m
 
-    **Beklenen Simulink Çıktıları:**
-    Simülasyon çalışırken veya bittikten sonra `traffic_model/Visualization` alt sistemindeki Scope blokları açılacaktır. Bu grafiklerde şunları gözlemleyebilirsiniz:
-    *   Kuyruk Uzunluğu (Queue Length)
-    *   Bekleme Süresi (Wait Time)
-    *   Trafik Işığı Sinyali
-    *   PID Kontrol Sinyali
+### Test ve Yardımcı Scriptler
+10. **test_traffic_model.m**
+    - **İşlev**: Trafik modeli doğrulama testi yapar.
+    - **Ayrıntı**: Model oluşturma sürecini test eder, hataları yakalar ve raporlar.
+    - **Bağımlılıklar**: create_traffic_model.m
 
-    *Örnek Çıktı Görünümleri (Simulink Scope'ları):*
-    <!-- Proje dizininizde bir "images" klasörü oluşturup ekran görüntülerini oraya kaydedin -->
-    <!-- Örnek: -->
-    <!-- ![Simulink Kuyruk Uzunluğu](images/simulink_kuyruk_uzunlugu.png) -->
-    <!-- ![Simulink Bekleme Süresi](images/simulink_bekleme_suresi.png) -->
-    <p align="center">
-      <em>(Simulink Scope'larından alınmış örnek ekran görüntülerini buraya ekleyin. Örneğin, kuyruk uzunluğunun zamanla nasıl değiştiğini gösteren bir grafik.)</em>
-    </p>
+11. **traffic_data.m**
+    - **İşlev**: Trafik verisi üretme ve işleme algoritmaları.
+    - **Ayrıntı**: OpenStreetMap verilerini işleyerek trafik simülasyonu için gerekli verileri üretir.
+    - **Bağımlılıklar**: (Bağımsız çalışabilir veya harici veri kaynaklarına bağlı olabilir)
 
-#### 2. Kapsamlı Kavşak Simülasyonu (`main_simulation.m`)
+12. **config.m**
+    - **İşlev**: Temel konfigürasyon değerlerini tanımlar.
+    - **Ayrıntı**: Tüm simülasyon ayarlarını ve varsayılan parametreleri içerir.
+    - **Bağımlılıklar**: (Bağımsız çalışır)
 
-Bu betik, dört yönlü bir kavşağı daha detaylı simüle eder ve kendi görselleştirmelerini üretir.
+13. **run_config.m**
+    - **İşlev**: Konfigürasyon parametrelerini yapılandırır ve uygular.
+    - **Ayrıntı**: Kullanıcı arayüzü olmaksızın konfigürasyon değişikliklerini yapmayı sağlar.
+    - **Bağımlılıklar**: config.m, config.mat
 
-1.  **Simülasyonu Başlatma:**
-    MATLAB komut satırına aşağıdaki komutu yazın:
-    ```matlab
-    main_simulation
-    ```
-    Betik çalışmaya başladığında konsolda "Trafik Işığı Simülasyonu Başlatılıyor..." mesajını ve ardından simülasyon adımlarına dair bilgileri göreceksiniz.
+## Gereksiz Olabilecek Scriptler ve Öneriler
+- **run_simulation.m** ve **run_simulation_with_visualization.m** benzer işlevlere sahiptir. run_simulation.m, run_simulation_with_visualization.m içindeki işlevselliğin bir alt kümesini sağlar.
+- **config.m** ve **run_config.m** işlevselliği birleştirilebilir.
+- Eğer **traffic_light_model_1.slx** eski bir sürüm ise ve kullanılmıyorsa kaldırılabilir.
 
-    **Beklenen `main_simulation.m` Çıktıları:**
-    Betik çalıştırıldığında iki ana pencere (figure) açılacaktır:
+## Simülasyon Parametreleri
+- Simülasyon süresi: 1 saat (tam modelde), 5 saniye (test modelinde)
+- Zaman adımı: 1 saniye (tam modelde), 0.01 saniye (test modelinde)
+- Minimum yeşil süre: 15 saniye
+- Maksimum yeşil süre: 90 saniye
+- Sarı ışık süresi: 3 saniye
 
-    *   **Pencere 1: "Trafik Işığı Kavşağı"**
-        *   Bu pencerede, dört yönlü kavşağın anlık durumu şematik olarak gösterilir.
-        *   Her yöndeki araç kuyrukları ve aktif olan trafik ışıkları görselleştirilir.
-        *   Simülasyon ilerledikçe bu görsel dinamik olarak güncellenir.
+## PID Kontrolcü Parametreleri
+- Kuzey-Güney yönü:
+  - Kp: 0.5
+  - Ki: 0.1
+  - Kd: 0.05
+- Doğu-Batı yönü:
+  - Kp: 0.5
+  - Ki: 0.1
+  - Kd: 0.05
 
-        *Örnek Çıktı Görünümü (Kavşak Figürü):*
-        <!-- Örnek: -->
-        <!-- ![Kavşak Simülasyon Anı](images/kavsak_simulasyonu.gif) <!-- GIF kullanmak daha etkili olabilir --> -->
-        <p align="center">
-          <em>(`visualize_intersection` fonksiyonunun ürettiği kavşak görselinin bir örneğini/GIF'ini buraya ekleyin.)</em>
-        </p>
+## Test Senaryoları
+1. Normal trafik yoğunluğu
+2. Yoğun trafik durumu
+3. Dengesiz trafik dağılımı
+4. Acil durum senaryoları
 
-    *   **Pencere 2: "Trafik Işığı Simülasyonu" (Metrik Grafikleri)**
-        *   Bu pencerede, simülasyon boyunca toplanan önemli performans metriklerinin zaman içindeki değişimi grafiklerle gösterilir (Kuyruk Uzunlukları, Ortalama Bekleme Süreleri, Işık Süreleri).
+## Sorun Giderme
+- **Simulink Modeli Çalışmıyor**: `run_traffic_simulation.m` otomatik olarak test modeli veya sentetik veri kullanır.
+- **Fixed-Step Solver Hatası**: SolverType ve MaxStep çakışması düzeltildi. Fixed-step solver kullanırken MaxStep parametresini kullanmayın.
+- **Veri Görselleştirilemiyor**: Workspace'de şu değişkenlerin olup olmadığını kontrol edin: 'log_time', 't', 'log_vehicle_queues', 'queue_lengths', 'average_wait_time_EW', 'density_EW'.
+- **Hata Mesajları**: Detailed model validation error veya Block not found gibi hata mesajları için create_traffic_model.m scriptinin düzgün çalıştığından emin olun.
 
-        *Örnek Çıktı Görünümü (Metrik Grafikleri Figürü):*
-        <!-- Örnek: -->
-        <!-- ![Metrik Grafikleri](images/metrik_grafikleri.png) -->
-        <p align="center">
-          <em>(`plot_metrics` fonksiyonunun ürettiği grafiklerin bir örneğini buraya ekleyin.)</em>
-        </p>
-
-    Simülasyon tamamlandığında, konsolda aşağıdaki gibi özet performans metrikleri de yazdırılacaktır:
-    ```
-    Performans Metrikleri:
-    Toplam geçen araç: [sayı]
-    Ortalama bekleme süreleri (K,G,D,B): [süre], [süre], [süre], [süre] saniye
-    Maksimum kuyruk uzunlukları (K,G,D,B): [araç sayısı], [araç sayısı], [araç sayısı], [araç sayısı] araç
-    ```
-
-## 🏗️ Proje Mimarisi (Opsiyonel ama Tavsiye Edilir)
-
-<!-- Bu bölüme, sistemin genel mimarisini veya `main_simulation.m` ile `traffic_model.slx` arasındaki ilişkiyi gösteren basit bir akış şeması veya açıklama ekleyebilirsiniz. Bu, projenizin anlaşılırlığını artıracaktır. -->
-<!-- Örnek: images/mimari.png -->
-
-## 🗣️ Geri Bildirim ve Öneriler
-
-Bu kişisel bir final projesi olsa da, proje hakkındaki geri bildirimleriniz ve önerileriniz benim için değerlidir. Lütfen düşüncelerinizi "Issues" bölümünden veya [E-posta Adresiniz (opsiyonel)] üzerinden paylaşmaktan çekinmeyin.
-
-## 📜 Lisans
-
-Bu proje [Lisans Adı, örn: MIT Lisansı] altında lisanslanmıştır. Daha fazla bilgi için `LICENSE` dosyasına bakın.
-<!-- Proje kök dizinine bir LISANS dosyası (örneğin LICENSE.txt veya LICENSE.md) eklemeyi unutmayın. Eğer bir lisans kullanmıyorsanız bu bölümü ve rozeti kaldırabilirsiniz. -->
-
-## 🙏 Teşekkür
-
-Bu projenin geliştirilmesi sürecindeki değerli yönlendirmeleri ve destekleri için başta danışman hocam **[Danışman Hocanızın Adı Soyadı, Ünvanı]** olmak üzere, **[Üniversite Adınız, Bölüm Adınız]**'e ve **[Dersin Adı]** dersini veren tüm hocalarıma teşekkür ederim.
-
----
-**Geliştirici:** [Adınız Soyadınız] - [Öğrenci Numaranız (opsiyonel)]
-[GitHub Profil Linkiniz (opsiyonel)]
-[LinkedIn Profil Linkiniz (opsiyonel)]
+## Sonuçlar ve Analiz
+Proje, aşağıdaki metrikleri ölçer ve analiz eder:
+- Ortalama bekleme süreleri
+- Kuyruk uzunlukları
+- Trafik yoğunluğu dağılımı
+- PID kontrolcü performansı
