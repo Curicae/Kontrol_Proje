@@ -77,71 +77,177 @@ Kontrol_Proje/
 ### Ana Koordinasyon ve Çalıştırma Scriptleri
 1. **run_traffic_simulation.m**
    - **İşlev**: Tüm simülasyon sürecini koordine eden merkezi script. 
-   - **Ayrıntı**: Önce ana simülasyonu, sonra test modelini çalıştırmayı dener, ikisi de başarısız olursa sentetik veri oluşturur ve görselleştirme yapar. Tüm hata durumlarını ele alır.
+   - **Neden Kullanmalısınız?**: Tek bir komutla tüm simülasyon ve görselleştirme sürecini yönetir. Bu script en kolay ve en güvenilir simülasyon çalıştırma yöntemidir.
+   - **Çalışma Mantığı**: 
+     1. Önce ana simülasyonu çalıştırmayı dener (run_simulation.m veya run_simulation_with_visualization.m)
+     2. Başarısız olursa basit test modelini çalıştırır
+     3. O da başarısız olursa sentetik test verisi oluşturur
+     4. Son olarak hem temel hem de gelişmiş görselleştirmeleri gerçekleştirir
+   - **Çıktılar**: Trafik kuyruk uzunlukları, bekleme süreleri, trafik yoğunlukları ve PID kontrolcü performansına dair grafikler
    - **Bağımlılıklar**: traffic_visualization.m, advanced_traffic_viz.m, test_visualization.m, run_simulation_with_visualization.m
 
 2. **run_simulation.m** 
    - **İşlev**: Trafik simülasyonunu basit şekilde çalıştıran script.
-   - **Ayrıntı**: Sadece simülasyonu çalıştırır, görselleştirme yapmaz.
+   - **Neden Kullanmalısınız?**: Görselleştirme olmadan sadece simülasyonu çalıştırmak istediğinizde kullanılır. Simülasyon sonuçlarını workspace'e kaydeder.
+   - **Çalışma Mantığı**: Simulink modelini açar, parametreleri ayarlar ve simülasyonu çalıştırır.
+   - **Çıktılar**: Workspace'e simülasyon sonuçlarını kaydeder: t (zaman vektörü), queue_lengths (kuyruk uzunlukları), average_wait_time_EW/NS (yönlere göre bekleme süreleri), density_EW/NS (yönlere göre trafik yoğunlukları)
    - **Bağımlılıklar**: traffic_light_model.slx, config.m
 
 3. **run_simulation_with_visualization.m**
    - **İşlev**: Simülasyonu çalıştıran ve sonuçları görselleştiren kapsamlı fonksiyon.
-   - **Ayrıntı**: İçerisinde basit bir test modeli çalıştırma fonksiyonu (run_simple_test_model) ve görselleştirme fonksiyonu (visualize_simulation_data) barındırır. Verileri model çalıştıktan sonra otomatik görselleştirir.
+   - **Neden Kullanmalısınız?**: Simülasyonu çalıştırıp sonuçları otomatik olarak görselleştirmek istediğinizde kullanılır. Ayrıca ana model çalışmazsa otomatik olarak test modeli oluşturur ve çalıştırır.
+   - **Çalışma Mantığı**: 
+     1. Ana modeli çalıştırmayı dener
+     2. Çalışmazsa içindeki run_simple_test_model() fonksiyonuyla basit bir test modeli oluşturur
+     3. Elde edilen verileri visualize_simulation_data() fonksiyonuyla görselleştirir
+   - **Çıktılar**: 
+     * İki panelli grafik (üstte kuyruk uzunluğu, altta bekleme süresi)
+     * Konsola simülasyon istatistikleri (maksimum kuyruk uzunluğu, maksimum bekleme süresi)
    - **Bağımlılıklar**: traffic_light_model.slx, (içerisindeki) run_simple_test_model fonksiyonu
 
 ### Simulink Modeli Oluşturma ve Yapılandırma
 4. **create_traffic_model.m**
    - **İşlev**: Trafik ışığı Simulink modelini programatik olarak oluşturur.
-   - **Ayrıntı**: Tüm model bileşenlerini (blokları, alt sistemleri, bağlantıları) oluşturur ve yapılandırır.
+   - **Neden Kullanmalısınız?**: Manuel olarak model oluşturmak yerine, tutarlı ve hatasız bir model yapısı oluşturmak için. Özellikle model yapısında değişiklikler yapmanız gerekiyorsa bu script kullanışlıdır.
+   - **Çalışma Mantığı**: Model bileşenlerini (bloklar, alt sistemler, bağlantılar) MATLAB komutlarıyla tanımlar ve bağlantılarını yapar.
+   - **Çıktılar**: traffic_light_model.slx dosyasını oluşturur/günceller ve yapılandırır.
    - **Bağımlılıklar**: initialize_parameters.m
 
 5. **main_simulation.m**
    - **İşlev**: Ana simülasyon süreci ve algoritmasını içerir.
-   - **Ayrıntı**: Simülasyon adımlarını, lojiğini ve veri toplama süreçlerini yönetir.
+   - **Neden Kullanmalısınız?**: Simulink modeli yerine MATLAB kodu üzerinden simülasyon çalıştırmak istediğinizde kullanılır. Daha fazla esneklik sağlar ve MATLAB betikleme özellikleriyle simülasyonu kontrol etmenize olanak tanır.
+   - **Çalışma Mantığı**: Trafik akışını, ışık durumlarını ve PID kontrolcü davranışını adım adım hesaplar.
+   - **Çıktılar**: Simulink modeline benzer çıktılar üretir: kuyruk uzunlukları, bekleme süreleri, trafik yoğunlukları.
    - **Bağımlılıklar**: traffic_data.m, config.m
 
 6. **initialize_parameters.m**
    - **İşlev**: Simülasyon parametrelerini başlatır.
-   - **Ayrıntı**: Tüm PID kontrolcü parametreleri, trafik akış parametreleri, simülasyon süresi gibi değerleri ayarlar.
+   - **Neden Kullanmalısınız?**: Simülasyon parametrelerini merkezi bir yerden yönetmek ve tutarlı parametre ayarlarını kullanmak için.
+   - **Çalışma Mantığı**: PID kontrolcü parametreleri, trafik akış parametreleri, simülasyon süresi gibi değişkenleri tanımlar ve workspace'e aktarır.
+   - **Çıktılar**: Doğrudan görsel çıktı olmamakla birlikte, workspace'e tüm simülasyon parametrelerini aktarır.
    - **Bağımlılıklar**: config.m
 
 ### Görselleştirme Araçları
 7. **traffic_visualization.m**
    - **İşlev**: Trafik simülasyon sonuçlarını görselleştiren bağımsız fonksiyon.
-   - **Ayrıntı**: Workspace'deki değişkenleri akıllıca bulur ve kuyruk uzunluğu/bekleme süresi grafiklerini çizer.
+   - **Neden Kullanmalısınız?**: Simülasyon sonuçlarını görsel olarak incelemek ve temel metrikleri analiz etmek için. Basit, anlaşılır grafikler sunar.
+   - **Çalışma Mantığı**: 
+     1. Workspace'de bulunan değişkenleri (log_time, t, queue_lengths, vb.) akıllıca tespit eder
+     2. Veri yoksa otomatik olarak sentetik veri oluşturur
+     3. İki panelli bir grafik çizer ve konsola simülasyon istatistiklerini yazdırır
+   - **Çıktılar**: 
+     * İki panelli grafik: 
+       - Üst panel: Kuyruk uzunluğu / trafik yoğunluğu grafiği
+       - Alt panel: Bekleme süresi grafiği
+     * Konsol çıktısı: Toplam simülasyon süresi, maksimum kuyruk uzunluğu, maksimum bekleme süresi
    - **Bağımlılıklar**: (Bağımsız çalışır, workspace'deki değişkenleri kullanır)
 
 8. **advanced_traffic_viz.m**
    - **İşlev**: Gelişmiş görselleştirme araçları sunan kapsamlı fonksiyon.
-   - **Ayrıntı**: Çoklu grafikler, 3B görselleştirme, ve kavşak görünümü animasyonu oluşturur.
-   - **Bağımlılıklar**: (Bağımsız çalışır, workspace'deki değişkenleri kullanır)
+   - **Neden Kullanmalısınız?**: Simülasyon sonuçlarını daha detaylı ve çeşitli açılardan incelemek istediğinizde. Temel görselleştirmeden çok daha kapsamlı analiz araçları sunar.
+   - **Çalışma Mantığı**: 
+     1. traffic_visualization.m'e benzer şekilde veri tespit eder veya oluşturur
+     2. Çok panelli grafikler ve 3B görselleştirmeler oluşturur
+     3. Ayrı bir pencerede kavşak görünümü animasyonu gösterir
+   - **Çıktılar**: 
+     * Çok panelli ana grafik penceresi:
+       - Kuyruk uzunlukları (Doğu-Batı ve Kuzey-Güney)
+       - Trafik yoğunlukları
+       - Ortalama bekleme süreleri
+       - Yeşil ışık süreleri
+       - 3B görselleştirme (Yoğunluk vs Bekleme Süresi vs Zaman)
+     * Kavşak Durum Görselleştirmesi penceresi:
+       - Simülasyonun son anındaki kavşağın durumu
+       - Trafik ışıklarının durumu ve araç kuyruklarının anında görsel temsili
+       - Simülasyon sonucunu sezgisel olarak anlamanızı sağlar
 
 9. **test_visualization.m**
    - **İşlev**: Sentetik test verisi oluşturur ve görselleştirir.
-   - **Ayrıntı**: Trafik kuyrukları, yoğunluklar, ve bekleme süreleri için sentetik veriler üretir.
+   - **Neden Kullanmalısınız?**: Simülasyon modelini çalıştıramadığınızda veya test amaçlı gerçekçi veri seti oluşturmak istediğinizde kullanılır.
+   - **Çalışma Mantığı**: 
+     1. Sinüs fonksiyonları kullanarak gerçekçi trafik dalgalanmaları içeren sentetik veri oluşturur
+     2. Tüm gerekli değişkenleri (zaman, kuyruk uzunlukları, yoğunluklar, bekleme süreleri) hesaplar
+     3. Bu verileri workspace'e aktarır ve traffic_visualization fonksiyonuyla görselleştirir
+   - **Çıktılar**: 
+     * traffic_visualization ile aynı görsel çıktılar
+     * Workspace'e aktarılan çeşitli değişkenler: log_time, log_vehicle_queues, density_EW/NS, average_wait_time_EW/NS, vb.
    - **Bağımlılıklar**: traffic_visualization.m
 
 ### Test ve Yardımcı Scriptler
 10. **test_traffic_model.m**
     - **İşlev**: Trafik modeli doğrulama testi yapar.
-    - **Ayrıntı**: Model oluşturma sürecini test eder, hataları yakalar ve raporlar.
+    - **Neden Kullanmalısınız?**: Model oluşturma sürecini test etmek, olası hataları tespit etmek ve modelin doğru çalıştığını doğrulamak istediğinizde.
+    - **Çalışma Mantığı**: create_traffic_model.m fonksiyonunu çağırır, model bileşenlerini kontrol eder ve olası hataları yakalar ve raporlar.
+    - **Çıktılar**: Konsola test sonuçlarını ve olası hataları raporlar. Grafik çıktısı yoktur.
     - **Bağımlılıklar**: create_traffic_model.m
 
 11. **traffic_data.m**
     - **İşlev**: Trafik verisi üretme ve işleme algoritmaları.
-    - **Ayrıntı**: OpenStreetMap verilerini işleyerek trafik simülasyonu için gerekli verileri üretir.
+    - **Neden Kullanmalısınız?**: Gerçekçi trafik verisi üretmek veya dış kaynaklardan (OpenStreetMap gibi) veri almak için.
+    - **Çalışma Mantığı**: 
+      1. Gerçek trafik verisine benzer trafik akış modelleri üretir
+      2. Farklı trafik senaryolarını (normal, yoğun, acil durum) simüle eder
+      3. İsteğe bağlı olarak dış API'lerden veri çekebilir
+    - **Çıktılar**: Doğrudan görsel çıktısı yoktur, ancak simülasyon için gerekli trafik verilerini üretir.
     - **Bağımlılıklar**: (Bağımsız çalışabilir veya harici veri kaynaklarına bağlı olabilir)
 
 12. **config.m**
     - **İşlev**: Temel konfigürasyon değerlerini tanımlar.
-    - **Ayrıntı**: Tüm simülasyon ayarlarını ve varsayılan parametreleri içerir.
+    - **Neden Kullanmalısınız?**: Proje genelinde kullanılan tüm parametreleri merkezi bir yerden tanımlamak ve yönetmek için.
+    - **Çalışma Mantığı**: Simülasyon süresi, zaman adımı, PID parametreleri, ışık süreleri gibi temel konfigürasyon değerlerini bir struct içinde tanımlar ve workspace'e aktarır.
+    - **Çıktılar**: Doğrudan görsel çıktısı yoktur, sadece konfigürasyon parametrelerini tanımlar.
     - **Bağımlılıklar**: (Bağımsız çalışır)
 
 13. **run_config.m**
-    - **İşlev**: Konfigürasyon parametrelerini yapılandırır ve uygular.
-    - **Ayrıntı**: Kullanıcı arayüzü olmaksızın konfigürasyon değişikliklerini yapmayı sağlar.
+    - **İşlev**: Konfigürasyon parametrelerini yükleme, değiştirme ve kaydetme işlemlerini yapar.
+    - **Neden Kullanmalısınız?**: Farklı simülasyon senaryoları için farklı konfigürasyon setleri oluşturmak ve yönetmek istediğinizde.
+    - **Çalışma Mantığı**: 
+      1. Mevcut konfigürasyon dosyasını yükler (config.mat)
+      2. Kullanıcıya konfigürasyon değişikliği yapma imkanı sunar
+      3. Yeni konfigürasyonu config.mat dosyasına kaydeder
+    - **Çıktılar**: Doğrudan görsel çıktısı yoktur, ancak konfigürasyon değişikliklerini konsola raporlar.
     - **Bağımlılıklar**: config.m, config.mat
+
+## Çıktılar ve Grafikler Açıklaması
+
+### Temel Görselleştirme (traffic_visualization.m)
+- **Kuyruk Uzunluğu / Trafik Yoğunluğu Grafiği**: 
+  - **X-ekseni**: Zaman (saniye)
+  - **Y-ekseni**: Araç sayısı veya normalize edilmiş yoğunluk (0-1)
+  - **Amaç**: Simülasyon boyunca kavşaktaki araç sayısının nasıl değiştiğini gösterir
+  - **Nasıl Yorumlanır**: Yüksek değerler trafik sıkışıklığını, düşük değerler akıcı trafiği gösterir
+
+- **Bekleme Süresi Grafiği**:
+  - **X-ekseni**: Zaman (saniye)
+  - **Y-ekseni**: Bekleme süresi (saniye)
+  - **Amaç**: Araçların ortalama bekleme süresinin zaman içindeki değişimini gösterir
+  - **Nasıl Yorumlanır**: PID kontrolcünün performansını değerlendirmede önemlidir, düşük bekleme süreleri daha iyi trafik akışı sağlandığını gösterir
+
+### Gelişmiş Görselleştirme (advanced_traffic_viz.m)
+- **Trafik Kuyruk Uzunlukları**:
+  - Doğu-Batı (mavi) ve Kuzey-Güney (kırmızı) yönlerindeki araç kuyruklarını ayrı ayrı gösterir
+  - İki yönün karşılaştırmasını yapmanızı sağlar
+  
+- **Trafik Yoğunlukları**:
+  - Kuyruk uzunluklarının normalize edilmiş hali (0-1 arası)
+  - Farklı kapasiteli yolları karşılaştırmayı kolaylaştırır
+  
+- **Ortalama Bekleme Süreleri**:
+  - Her iki yön için ayrı ayrı bekleme sürelerini gösterir
+  - PID kontrolcünün her yöndeki etkinliğini değerlendirmenizi sağlar
+  
+- **Yeşil Işık Süreleri**:
+  - PID kontrolcünün her yön için belirlediği yeşil ışık sürelerini gösterir
+  - Kontrolcünün dinamik olarak nasıl tepki verdiğini anlamanızı sağlar
+  
+- **3B Görselleştirme (Yoğunluk vs Bekleme Süresi vs Zaman)**:
+  - Yoğunluk ve bekleme süresinin zaman içindeki ilişkisini üç boyutlu gösterir
+  - Sistemin dinamik davranışını anlamanızı sağlar
+  
+- **Kavşak Durum Görselleştirmesi**:
+  - Simülasyonun son anındaki kavşak durumunu gösterir
+  - Trafik ışıklarının durumu ve araç kuyruklarının anında görsel temsili
+  - Simülasyon sonucunu sezgisel olarak anlamanızı sağlar
 
 ## Gereksiz Olabilecek Scriptler ve Öneriler
 - **run_simulation.m** ve **run_simulation_with_visualization.m** benzer işlevlere sahiptir. run_simulation.m, run_simulation_with_visualization.m içindeki işlevselliğin bir alt kümesini sağlar.

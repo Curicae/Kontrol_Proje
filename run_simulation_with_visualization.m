@@ -598,7 +598,7 @@ function [success, tout, yout] = run_simple_test_model()
                 yout = sim_out.yout_test;
                 success = true;
             else
-                disp('Workspace veya simOut nesnesinde veri bulunamadı!');
+                disp('Workspace veya simOut nesnesinde beklenen veriler bulunamadı. Sentetik test verisi oluşturuluyor...');
                 % Son çare - yapay veri üret
                 tout = 0:0.01:5;
                 tout = tout(:);
